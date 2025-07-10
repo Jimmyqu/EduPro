@@ -1,0 +1,498 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 14px;
+  --background: #ffffff;
+  --foreground: oklch(0.145 0 0);
+  --card: #ffffff;
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #030213;
+  --primary-light: rgba(3, 2, 19, 0.1);
+  --primary-lighter: rgba(3, 2, 19, 0.05);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.0058 264.53);
+  --secondary-light: rgba(242, 242, 250, 0.2);
+  --secondary-foreground: #030213;
+  --muted: #ececf0;
+  --muted-foreground: #717182;
+  --accent: #e9ebef;
+  --accent-foreground: #030213;
+  --destructive: #d4183d;
+  --destructive-light: rgba(212, 24, 61, 0.1);
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --input: transparent;
+  --input-background: #f3f3f5;
+  --switch-background: #cbced4;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: #030213;
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-light: rgba(251, 251, 251, 0.1);
+  --primary-lighter: rgba(251, 251, 251, 0.05);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-light: rgba(69, 69, 69, 0.2);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-light: rgba(101, 36, 36, 0.2);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    min-width: 320px;
+  }
+
+  /* 强制桌面模式样式 */
+  .force-desktop {
+    min-width: 1200px !important;
+  }
+}
+
+/**
+ * 强化的桌面版强制显示样式
+ * 确保在手机浏览器桌面版模式下完全匹配电脑端显示
+ */
+@layer utilities {
+  /* 基础强制桌面样式 */
+  .force-desktop .md\:flex {
+    display: flex !important;
+  }
+  
+  .force-desktop .md\:block {
+    display: block !important;
+  }
+  
+  .force-desktop .md\:grid {
+    display: grid !important;
+  }
+
+  .force-desktop .md\:hidden {
+    display: none !important;
+  }
+
+  .force-desktop .hidden.sm\:inline {
+    display: inline !important;
+  }
+
+  .force-desktop .hidden.sm\:block {
+    display: block !important;
+  }
+
+  .force-desktop .hidden.md\:flex {
+    display: flex !important;
+  }
+
+  /* 网格布局强制 */
+  .force-desktop .grid-cols-1 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .force-desktop .md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .force-desktop .lg\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .force-desktop .md\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .force-desktop .lg\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  /* 间距和布局 */
+  .force-desktop .space-x-8 > :not([hidden]) ~ :not([hidden]) {
+    margin-left: 2rem !important;
+  }
+
+  .force-desktop .gap-6 {
+    gap: 1.5rem !important;
+  }
+
+  .force-desktop .gap-4 {
+    gap: 1rem !important;
+  }
+
+  /* 容器宽度 */
+  .force-desktop .max-w-7xl {
+    max-width: 80rem !important;
+  }
+
+  .force-desktop .container {
+    max-width: 1200px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /* 内边距 */
+  .force-desktop .px-4 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .force-desktop .sm\:px-6 {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+  }
+
+  .force-desktop .lg\:px-8 {
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+  }
+
+  /* 文字和按钮 */
+  .force-desktop .text-sm {
+    font-size: 0.875rem !important;
+    line-height: 1.25rem !important;
+  }
+
+  .force-desktop .text-base {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+  }
+
+  .force-desktop .text-lg {
+    font-size: 1.125rem !important;
+    line-height: 1.75rem !important;
+  }
+
+  .force-desktop .text-xl {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+  }
+
+  /* 卡片和组件尺寸 */
+  .force-desktop .h-16 {
+    height: 4rem !important;
+  }
+
+  .force-desktop .h-8 {
+    height: 2rem !important;
+  }
+
+  .force-desktop .w-8 {
+    width: 2rem !important;
+  }
+
+  /* 特定组件的桌面版样式 */
+  .force-desktop .rounded-md {
+    border-radius: 0.375rem !important;
+  }
+
+  .force-desktop .shadow-sm {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+  }
+
+  /* 导航相关 */
+  .force-desktop nav {
+    display: flex !important;
+    align-items: center !important;
+    gap: 2rem !important;
+  }
+
+  .force-desktop nav button {
+    padding: 0.5rem 0.75rem !important;
+    border-radius: 0.375rem !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    transition: all 0.2s !important;
+  }
+
+  /* 头像和用户信息 */
+  .force-desktop .avatar-container {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+  }
+
+  .force-desktop .user-info {
+    display: inline !important;
+    font-size: 0.875rem !important;
+    color: rgb(55 65 81) !important;
+  }
+
+  /* 按钮组 */
+  .force-desktop .button-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+  }
+
+  .force-desktop .button-group button span {
+    display: inline !important;
+  }
+}
+
+/**
+ * 强制覆盖所有可能的移动端样式
+ */
+@layer components {
+  .force-desktop * {
+    /* 确保所有隐藏的桌面元素都显示 */
+  }
+
+  /* 特殊情况下的强制显示 */
+  body.force-desktop .md\:flex,
+  html.force-desktop .md\:flex {
+    display: flex !important;
+  }
+
+  body.force-desktop .hidden.sm\:inline,
+  html.force-desktop .hidden.sm\:inline {
+    display: inline !important;
+  }
+
+  body.force-desktop .md\:hidden,
+  html.force-desktop .md\:hidden {
+    display: none !important;
+  }
+
+  /* 网格系统强制 */
+  body.force-desktop .grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3,
+  html.force-desktop .grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  body.force-desktop .grid-cols-1.md\:grid-cols-2,
+  html.force-desktop .grid-cols-1.md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/**
+ * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h3 {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h4 {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    p {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+
+    label {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    button {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/**
+ * 改进的响应式设计
+ */
+@layer base {
+  .container {
+    min-width: 320px;
+  }
+  
+  .responsive-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  @media (min-width: 768px) {
+    .responsive-grid {
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .responsive-grid {
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    }
+  }
+
+  /* 确保强制桌面模式在所有情况下都有效 */
+  .force-desktop {
+    width: 100% !important;
+    min-width: 1200px !important;
+    overflow-x: auto;
+  }
+
+  .force-desktop body {
+    min-width: 1200px !important;
+  }
+}
+
+/**
+ * 最高优先级的强制桌面样式 - 使用!important确保覆盖所有其他样式
+ */
+.force-desktop .md\:flex,
+.force-desktop .lg\:flex,
+.force-desktop .xl\:flex {
+  display: flex !important;
+}
+
+.force-desktop .md\:block,
+.force-desktop .lg\:block,
+.force-desktop .xl\:block {
+  display: block !important;
+}
+
+.force-desktop .md\:grid,
+.force-desktop .lg\:grid,
+.force-desktop .xl\:grid {
+  display: grid !important;
+}
+
+.force-desktop .md\:hidden,
+.force-desktop .lg\:hidden,
+.force-desktop .xl\:hidden {
+  display: none !important;
+}
+
+.force-desktop .hidden.sm\:inline,
+.force-desktop .hidden.md\:inline,
+.force-desktop .hidden.lg\:inline {
+  display: inline !important;
+}
+
+.force-desktop .hidden.sm\:block,
+.force-desktop .hidden.md\:block,
+.force-desktop .hidden.lg\:block {
+  display: block !important;
+}
