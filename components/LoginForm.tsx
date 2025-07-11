@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 
-export function LoginForm() {
+export function LoginForm({ setShowRegister }: { setShowRegister: (show: boolean) => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

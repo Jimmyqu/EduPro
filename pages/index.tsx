@@ -233,7 +233,7 @@ export default function Home() {
               ✕
             </button>
             <div className="p-6">
-              <LoginForm />
+              <LoginForm setShowRegister={() => setShowRegister(true)} />
               <p className="text-center mt-4 text-sm text-muted-foreground">
                 还没有账号？
                 <button 
