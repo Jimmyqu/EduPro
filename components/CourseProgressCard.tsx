@@ -4,10 +4,11 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Play, BookOpen, FileText, Clock, TrendingUp } from "lucide-react";
 import { CourseProgress } from "../contexts/AuthContext";
+import { Section } from "../types/navigation";
 
 interface CourseProgressCardProps {
   course: CourseProgress;
-  onNavigate: (section: string) => void;
+  onNavigate: (section: Section) => void;
 }
 
 export function CourseProgressCard({ course, onNavigate }: CourseProgressCardProps) {

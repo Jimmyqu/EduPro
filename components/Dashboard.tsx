@@ -8,11 +8,11 @@ import { Play, FileText, BookOpen, Settings, Trophy, TrendingUp, GraduationCap, 
 import { useAuth } from "../contexts/AuthContext";
 import { CourseProgressCard } from "./CourseProgressCard";
 import { CourseStatsOverview } from "./CourseStatsOverview";
-
-type Section = 'dashboard' | 'pdfs' | 'videos' | 'exercises' | 'exams' | 'profile';
+import { Section } from "../types/navigation";
+import { toast } from "sonner";
 
 interface DashboardProps {
-  onNavigate: (section: Section | string) => void;
+  onNavigate: (section: Section) => void;
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
@@ -26,7 +26,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   // 显示权限提示
   const showAccessDeniedAlert = (courseName: string) => {
-    alert(`您没有权限访问《${courseName}》课程。`);
+    toast.error(`您没有权限访问《${courseName}》课程。`, {
+      description: "请联系管理员或升级您的账户以获取访问权限。",
+      duration: 4000,
+    });
   };
 
   const features = [
@@ -145,15 +148,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <p className="text-gray-600">继续您的职业培训学习</p>
           </div>
         </div>
-        
-        <Button 
-          onClick={() => onNavigate('profile')} 
-          variant="outline"
-          className="flex items-center space-x-2"
-        >
-          <Settings className="h-4 w-4" />
-          <span>个人资料</span>
-        </Button>
       </div>
 
       {/* Tabs for different views */}

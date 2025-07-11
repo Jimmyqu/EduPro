@@ -55,9 +55,6 @@ export function AccessDenied({ course, onBackToDashboard }: AccessDeniedProps) {
           </div>
 
           <div className="space-y-2">
-            <Button onClick={onBackToDashboard} className="w-full">
-              返回学习中心
-            </Button>
             <Button 
               variant="outline" 
               className="w-full"

@@ -6,6 +6,7 @@ import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { ArrowLeft, Search, FileText, Download, Eye, Calendar, Lock, Users, Star, Clock } from "lucide-react";
 import { useAuth, availableCourses } from "../contexts/AuthContext";
+import { toast } from "sonner";
 
 interface PDFDocument {
   id: string;
@@ -222,7 +223,10 @@ export function PDFLibrary({ onBack }: PDFLibraryProps) {
     if (!hasAccess(pdf.courseId)) {
       const course = availableCourses.find(c => c.id === pdf.courseId);
       if (course) {
-        alert(`您没有权限访问《${course.name}》课程的学习课件。`);
+        toast.error(`您没有权限访问《${course.name}》课程的学习课件。`, {
+          description: "请联系管理员或升级您的账户以获取访问权限。",
+          duration: 4000,
+        });
       }
       return;
     }
@@ -244,7 +248,10 @@ export function PDFLibrary({ onBack }: PDFLibraryProps) {
     if (!hasAccess(courseId)) {
       const course = availableCourses.find(c => c.id === courseId);
       if (course) {
-        alert(`您没有权限访问《${course.name}》课程。`);
+        toast.error(`您没有权限访问《${course.name}》课程。`, {
+          description: "请联系管理员或升级您的账户以获取访问权限。",
+          duration: 4000,
+        });
       }
       return;
     }
@@ -414,10 +421,6 @@ export function PDFLibrary({ onBack }: PDFLibraryProps) {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Button onClick={onBack} variant="ghost">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            返回学习中心
-          </Button>
           <h1 className="text-3xl mt-2">学习课件</h1>
           <p className="text-gray-600 mt-1">选择课程查看和下载学习课件</p>
         </div>

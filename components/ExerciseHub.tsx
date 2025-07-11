@@ -9,6 +9,7 @@ import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { ArrowLeft, CheckCircle, XCircle, Trophy, BookOpen, RotateCcw, History, Brain, Target, Eye, AlertCircle, ChevronLeft, ChevronRight, List, Filter, TrendingUp, TrendingDown, Minus, Users, Star, Clock, RefreshCw } from "lucide-react";
 import { useAuth, availableCourses, ExerciseProgress, ExerciseAttempt } from "../contexts/AuthContext";
+import { toast } from "sonner";
 
 interface Question {
   id: string;
@@ -246,7 +247,10 @@ export function ExerciseHub({ onBack }: ExerciseHubProps) {
     if (mode === 'wrongQuestions') {
       const wrongQuestions = getWrongQuestions(exercise.id);
       if (wrongQuestions.length === 0) {
-        alert('当前练习没有错题！');
+        toast.success('当前练习没有错题！', {
+          description: "恭喜您！这个练习的所有题目都已答对。",
+          duration: 3000,
+        });
         return;
       }
       setReviewQuestions(wrongQuestions);
@@ -459,10 +463,6 @@ export function ExerciseHub({ onBack }: ExerciseHubProps) {
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <Button onClick={onBack} variant="ghost">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              返回学习中心
-            </Button>
             <h1 className="text-3xl mt-2">练习中心</h1>
             <p className="text-gray-600 mt-1">选择课程开始练习</p>
           </div>

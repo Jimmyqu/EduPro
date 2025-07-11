@@ -75,16 +75,6 @@ export function UserProfile({ onBack }: UserProfileProps) {
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <Button onClick={onBack} variant="ghost">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          返回
-        </Button>
-        <Button onClick={logout} variant="outline">
-          退出登录
-        </Button>
-      </div>
-
       <div className="max-w-4xl mx-auto">
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">

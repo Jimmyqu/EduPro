@@ -6,6 +6,7 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { Play, Clock, Search, ArrowLeft, Lock, BookOpen, Wrench, Users, Star } from "lucide-react";
 import { useAuth, availableCourses } from "../contexts/AuthContext";
+import { toast } from "sonner";
 
 interface Video {
   id: string;
@@ -160,7 +161,10 @@ export function VideoLibrary({ onBack }: VideoLibraryProps) {
     if (!hasAccess(video.courseId)) {
       const course = availableCourses.find(c => c.id === video.courseId);
       if (course) {
-        alert(`您没有权限访问《${course.name}》课程。`);
+        toast.error(`您没有权限访问《${course.name}》课程。`, {
+          description: "请联系管理员或升级您的账户以获取访问权限。",
+          duration: 4000,
+        });
       }
       return;
     }
@@ -172,7 +176,10 @@ export function VideoLibrary({ onBack }: VideoLibraryProps) {
     if (!hasAccess(courseId)) {
       const course = availableCourses.find(c => c.id === courseId);
       if (course) {
-        alert(`您没有权限访问《${course.name}》课程。`);
+        toast.error(`您没有权限访问《${course.name}》课程。`, {
+          description: "请联系管理员或升级您的账户以获取访问权限。",
+          duration: 4000,
+        });
       }
       return;
     }
@@ -365,10 +372,6 @@ export function VideoLibrary({ onBack }: VideoLibraryProps) {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Button onClick={onBack} variant="ghost">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            返回学习中心
-          </Button>
           <h1 className="text-3xl mt-2">视频学习</h1>
           <p className="text-gray-600 mt-1">选择课程开始观看职业培训视频</p>
         </div>

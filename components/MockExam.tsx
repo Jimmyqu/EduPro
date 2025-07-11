@@ -9,6 +9,7 @@ import { Label } from "./ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { ArrowLeft, Clock, FileText, Trophy, AlertCircle, CheckCircle2, XCircle, Eye, Calendar, Timer, Users, Target, BookOpen, Award, History, Play, Pause, RotateCcw, Save, RefreshCw, Brain, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth, availableCourses, MockExamProgress, MockExamAttempt } from "../contexts/AuthContext";
+import { toast } from "sonner";
 
 interface MockExamQuestion {
   id: string;
@@ -378,7 +379,10 @@ export function MockExam({ onBack }: MockExamHubProps) {
 
   const handleTimeUp = () => {
     setIsTimerRunning(false);
-    alert('考试时间已到，系统将自动提交您的答案。');
+    toast.warning('考试时间已到！', {
+      description: "系统将自动提交您的答案。",
+      duration: 5000,
+    });
     handleSubmitExam();
   };
 
@@ -409,7 +413,6 @@ export function MockExam({ onBack }: MockExamHubProps) {
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <Button onClick={onBack} variant="ghost"><ArrowLeft className="h-4 w-4 mr-2" />返回学习中心</Button>
             <h1 className="text-3xl mt-2">模拟考试</h1>
             <p className="text-gray-600 mt-1">选择课程查看相关模拟考试</p>
           </div>
