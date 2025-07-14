@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiAdapter, initializeApi } from '../lib/apiAdapter';
+import { toast } from 'sonner';
 
 export interface CourseProgress {
   courseId: string;
@@ -149,7 +151,7 @@ interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
   updateCourseProgress: (courseId: string, updates: Partial<CourseProgress>) => void;
   updateExerciseProgress: (exerciseId: string, updates: Partial<ExerciseProgress>) => void;
@@ -374,117 +376,7 @@ const generateCourseEnrollments = (enrolledCourses: string[]): CourseEnrollment[
   return enrollments;
 };
 
-// 模拟用户数据存储
-const mockUsers: (User & { password: string })[] = [
-  {
-    id: '1',
-    username: 'student1',
-    email: 'student1@example.com',
-    fullName: '张三',
-    password: 'password123',
-    joinDate: '2025-01-01',
-    avatar: rabbitAvatarUrl,
-    studyStats: {
-      videosWatched: 85,
-      exercisesCompleted: 45,
-      pdfsRead: 32,
-      studyHours: 120,
-    },
-    enrolledCourses: ['health-manager', 'mental-health-counselor', 'rehabilitation-therapist'],
-    courseProgress: [
-      {
-        courseId: 'health-manager',
-        courseName: '健康管理师',
-        category: '健康管理',
-        totalVideos: 48,
-        watchedVideos: 32,
-        totalExercises: 20,
-        completedExercises: 15,
-        totalPDFs: 15,
-        readPDFs: 10,
-        studyHours: 35,
-        lastActivity: '2025-01-07',
-        completionPercentage: 70,
-      },
-      {
-        courseId: 'mental-health-counselor',
-        courseName: '心理健康指导',
-        category: '心理健康',
-        totalVideos: 56,
-        watchedVideos: 28,
-        totalExercises: 25,
-        completedExercises: 18,
-        totalPDFs: 18,
-        readPDFs: 12,
-        studyHours: 42,
-        lastActivity: '2025-01-06',
-        completionPercentage: 58,
-      },
-      {
-        courseId: 'rehabilitation-therapist',
-        courseName: '康复理疗师',
-        category: '康复医学',
-        totalVideos: 64,
-        watchedVideos: 20,
-        totalExercises: 28,
-        completedExercises: 8,
-        totalPDFs: 22,
-        readPDFs: 6,
-        studyHours: 28,
-        lastActivity: '2025-01-05',
-        completionPercentage: 35,
-      }
-    ],
-    courseEnrollments: generateCourseEnrollments(['health-manager', 'mental-health-counselor', 'rehabilitation-therapist']),
-    exerciseProgress: [],
-    mockExamProgress: [], // 新增字段
-    mockExamAttempts: [], // 新增字段
-    preferences: {
-      preferredSubjects: ['健康管理', '心理健康'],
-      difficulty: 'Medium'
-    }
-  },
-  {
-    id: '2',
-    username: 'student2',
-    email: 'student2@example.com',
-    fullName: '李四',
-    password: 'password123',
-    joinDate: '2025-01-02',
-    avatar: rabbitAvatarUrl,
-    studyStats: {
-      videosWatched: 15,
-      exercisesCompleted: 22,
-      pdfsRead: 8,
-      studyHours: 32,
-    },
-    enrolledCourses: ['childcare-specialist'],
-    courseProgress: [
-      {
-        courseId: 'childcare-specialist',
-        courseName: '育婴员',
-        category: '母婴护理',
-        totalVideos: 40,
-        watchedVideos: 12,
-        totalExercises: 18,
-        completedExercises: 15,
-        totalPDFs: 12,
-        readPDFs: 6,
-        studyHours: 22,
-        lastActivity: '2025-01-07',
-        completionPercentage: 72,
-      }
-    ],
-    courseEnrollments: generateCourseEnrollments(['childcare-specialist']),
-    exerciseProgress: [],
-    mockExamProgress: [], // 新增字段
-    mockExamAttempts: [], // 新增字段
-    preferences: {
-      preferredSubjects: ['母婴护理'],
-      difficulty: 'Easy'
-    }
-  },
-];
+
 
 // Helper function to ensure user has all required fields and clean up invalid course data
 const ensureUserCompatibility = (user: any): User => {
@@ -530,52 +422,36 @@ const ensureUserCompatibility = (user: any): User => {
   };
 };
 
-// 加载存储的用户数据
-const loadStoredUsers = () => {
-  const storedUsers = localStorage.getItem('mockUsers');
-  if (storedUsers) {
-    try {
-      const users = JSON.parse(storedUsers);
-      mockUsers.splice(0, mockUsers.length, ...users);
-    } catch (error) {
-      console.error('Failed to load stored users:', error);
-    }
-  }
-};
 
-// 保存用户数据到本地存储
-const saveUsersToStorage = () => {
-  try {
-    localStorage.setItem('mockUsers', JSON.stringify(mockUsers));
-  } catch (error) {
-    console.error('Failed to save users to storage:', error);
-  }
-};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 初始化题目统计数据
-    initializeQuestionStats();
-    
-    // 加载存储的用户数据
-    loadStoredUsers();
-    
-    // 检查本地存储中是否有用户登录信息
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try {
-        const userData = JSON.parse(savedUser);
-        const compatibleUser = ensureUserCompatibility(userData);
-        setUser(compatibleUser);
-      } catch (error) {
-        console.error('Failed to parse saved user data:', error);
-        localStorage.removeItem('currentUser');
+    const initialize = async () => {
+      // 初始化API连接
+      await initializeApi();
+      
+      // 初始化题目统计数据
+      initializeQuestionStats();
+      
+      // 检查本地存储中是否有用户登录信息
+      const savedUser = localStorage.getItem('currentUser');
+      if (savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          const compatibleUser = ensureUserCompatibility(userData);
+          setUser(compatibleUser);
+        } catch (error) {
+          console.error('Failed to parse saved user data:', error);
+          localStorage.removeItem('currentUser');
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+    
+    initialize();
   }, []);
 
   const hasAccess = (courseId: string): boolean => {
@@ -714,13 +590,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('保存到localStorage失败:', error);
     }
     
-    // 更新mockUsers中的数据
-    const userIndex = mockUsers.findIndex(u => u.id === user.id);
-    if (userIndex !== -1) {
-      mockUsers[userIndex] = { ...mockUsers[userIndex], exerciseProgress: updatedExerciseProgress };
-      saveUsersToStorage();
-      console.log('已更新mockUsers');
-    }
+
 
     // 验证保存结果
     setTimeout(() => {
@@ -779,13 +649,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('保存考试进度到localStorage失败:', error);
     }
 
-    // 更新mockUsers中的数据
-    const userIndex = mockUsers.findIndex(u => u.id === user.id);
-    if (userIndex !== -1) {
-      mockUsers[userIndex] = { ...mockUsers[userIndex], mockExamProgress: updatedMockExamProgress };
-      saveUsersToStorage();
-    }
-
     console.log('考试进度已保存');
   };
 
@@ -807,13 +670,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('删除考试进度时保存到localStorage失败:', error);
     }
-
-    // 更新mockUsers中的数据
-    const userIndex = mockUsers.findIndex(u => u.id === user.id);
-    if (userIndex !== -1) {
-      mockUsers[userIndex] = { ...mockUsers[userIndex], mockExamProgress: updatedMockExamProgress };
-      saveUsersToStorage();
-    }
   };
 
   const saveMockExamAttempt = (attempt: MockExamAttempt) => {
@@ -828,13 +684,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
     } catch (error) {
       console.error('保存考试记录到localStorage失败:', error);
-    }
-
-    // 更新mockUsers中的数据
-    const userIndex = mockUsers.findIndex(u => u.id === user.id);
-    if (userIndex !== -1) {
-      mockUsers[userIndex] = { ...mockUsers[userIndex], mockExamAttempts: updatedMockExamAttempts };
-      saveUsersToStorage();
     }
   };
 
@@ -851,81 +700,95 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     
-    // 模拟API调用延迟
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const foundUser = mockUsers.find(
-      u => u.username === username && u.password === password
-    );
-    
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
-      const compatibleUser = ensureUserCompatibility(userWithoutPassword);
-      setUser(compatibleUser);
-      localStorage.setItem('currentUser', JSON.stringify(compatibleUser));
+    try {
+      const result = await apiAdapter.login(username, password);
+      
+      if (result.success && result.user) {
+        const compatibleUser = ensureUserCompatibility(result.user);
+        setUser(compatibleUser);
+        localStorage.setItem('currentUser', JSON.stringify(compatibleUser));
+        
+        toast.success('登录成功', {
+          description: `欢迎回来，${compatibleUser.fullName}！`,
+          duration: 3000,
+        });
+        
+        setIsLoading(false);
+        return true;
+      } else {
+        toast.error('登录失败', {
+          description: result.error || '用户名或密码错误',
+          duration: 4000,
+        });
+        
+        setIsLoading(false);
+        return false;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('登录失败', {
+        description: '网络连接错误，请稍后重试',
+        duration: 4000,
+      });
+      
       setIsLoading(false);
-      return true;
+      return false;
     }
-    
-    setIsLoading(false);
-    return false;
   };
 
   const register = async (userData: RegisterData): Promise<boolean> => {
     setIsLoading(true);
     
-    // 模拟API调用延迟
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // 检查用户名是否已存在
-    const existingUser = mockUsers.find(u => u.username === userData.username);
-    if (existingUser) {
+    try {
+      const result = await apiAdapter.register(userData);
+      
+      if (result.success && result.user) {
+        const compatibleUser = ensureUserCompatibility(result.user);
+        setUser(compatibleUser);
+        localStorage.setItem('currentUser', JSON.stringify(compatibleUser));
+        
+        toast.success('注册成功', {
+          description: `欢迎加入，${compatibleUser.fullName}！`,
+          duration: 3000,
+        });
+        
+        setIsLoading(false);
+        return true;
+      } else {
+        toast.error('注册失败', {
+          description: result.error || '注册过程中发生错误',
+          duration: 4000,
+        });
+        
+        setIsLoading(false);
+        return false;
+      }
+    } catch (error) {
+      console.error('Register error:', error);
+      toast.error('注册失败', {
+        description: '网络连接错误，请稍后重试',
+        duration: 4000,
+      });
+      
       setIsLoading(false);
       return false;
     }
-    
-    // 创建新用户
-    const newUser: User & { password: string } = {
-      id: (mockUsers.length + 1).toString(),
-      username: userData.username,
-      email: userData.email,
-      fullName: userData.fullName,
-      password: userData.password,
-      joinDate: new Date().toISOString().split('T')[0],
-      avatar: rabbitAvatarUrl,
-      studyStats: {
-        videosWatched: 0,
-        exercisesCompleted: 0,
-        pdfsRead: 0,
-        studyHours: 0,
-      },
-      enrolledCourses: [],
-      courseProgress: [],
-      courseEnrollments: [],
-      exerciseProgress: [],
-      mockExamProgress: [],
-      mockExamAttempts: [],
-      preferences: {
-        preferredSubjects: [],
-        difficulty: 'Medium'
-      }
-    };
-    
-    mockUsers.push(newUser);
-    saveUsersToStorage();
-    
-    const { password: _, ...userWithoutPassword } = newUser;
-    const compatibleUser = ensureUserCompatibility(userWithoutPassword);
-    setUser(compatibleUser);
-    localStorage.setItem('currentUser', JSON.stringify(compatibleUser));
-    
-    setIsLoading(false);
-    return true;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await apiAdapter.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    
     setUser(null);
     localStorage.removeItem('currentUser');
+    
+    toast.info('已退出登录', {
+      description: '感谢您的使用，期待下次再见！',
+      duration: 3000,
+    });
   };
 
   const updateUser = (updates: Partial<User>) => {
@@ -933,13 +796,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const updatedUser = { ...user, ...updates };
       setUser(updatedUser);
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-      
-      // 更新mockUsers中的数据
-      const userIndex = mockUsers.findIndex(u => u.id === user.id);
-      if (userIndex !== -1) {
-        mockUsers[userIndex] = { ...mockUsers[userIndex], ...updates };
-        saveUsersToStorage();
-      }
     }
   };
 

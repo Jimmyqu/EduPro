@@ -97,16 +97,7 @@ export function LoginForm({ setShowRegister }: { setShowRegister: (show: boolean
             </Button>
           </form>
           
-          {/* 测试账户信息 */}
-          <div className="mt-6 text-center">
-            <div className="text-xs text-gray-500 space-y-1">
-              <p className="font-medium">演示账户（用于测试）：</p>
-              <div className="bg-gray-50 rounded p-2 space-y-1">
-                <p>用户名: student1 密码: password123</p>
-                <p>用户名: student2 密码: password123</p>
-              </div>
-            </div>
-          </div>
+
         </CardContent>
 
         <CardFooter className="justify-center">

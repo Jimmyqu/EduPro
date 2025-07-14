@@ -1,36 +1,230 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { Play, FileText, BookOpen, Settings, Trophy, TrendingUp, GraduationCap, ClipboardCheck, Lock, AlertCircle } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
+import { Play, FileText, BookOpen, Settings, Trophy, TrendingUp, GraduationCap, ClipboardCheck, Lock, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { CourseProgressCard } from "./CourseProgressCard";
 import { CourseStatsOverview } from "./CourseStatsOverview";
 import { Section } from "../types/navigation";
 import { toast } from "sonner";
+import { apiService, isApiSuccess } from "../lib/api";
+import { 
+  ApiUser, 
+  ApiCourse, 
+  ApiEnrollment, 
+  ApiLearningProgress,
+  convertApiUserToLocal, 
+  convertApiCourseToLocal,
+  convertApiEnrollmentToLocal,
+  convertApiProgressToLocal,
+  convertEnrollmentToProgress 
+} from "../types/api";
 
 interface DashboardProps {
   onNavigate: (section: Section) => void;
 }
 
+// 定义本地状态类型
+interface DashboardData {
+  user: any;
+  myCourses: any[];
+  allCourses: any[];
+  courseProgress: any[];
+  isLoading: boolean;
+}
+
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { user, availableCourses, hasAccess } = useAuth();
+  const { user: authUser } = useAuth();
+  
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    user: null,
+    myCourses: [],
+    allCourses: [],
+    courseProgress: [],
+    isLoading: true
+  });
 
-  if (!user) return null;
+  // 确认对话框状态
+  const [enrollDialog, setEnrollDialog] = useState<{
+    isOpen: boolean;
+    courseId: string;
+    courseName: string;
+  }>({
+    isOpen: false,
+    courseId: '',
+    courseName: ''
+  });
 
-  // Safe access to courseProgress with default empty array
-  const courseProgress = user.courseProgress || [];
-  const enrolledCourses = user.enrolledCourses || [];
+  // 获取仪表板数据
+  const fetchDashboardData = async () => {
+    if (!authUser) return;
+
+    try {
+      setDashboardData(prev => ({ ...prev, isLoading: true }));
+
+      // 并行获取所有需要的数据
+      const [profileResponse, myCoursesResponse, allCoursesResponse] = await Promise.all([
+        apiService.getProfile(),
+        apiService.getMyCourses(),
+        apiService.getCourses({ per_page: 50 }) // 获取更多课程用于展示
+      ]);
+
+      // 检查响应状态
+      if (!isApiSuccess(profileResponse)) {
+        toast.error("获取用户信息失败", { description: profileResponse.message });
+        return;
+      }
+
+      if (!isApiSuccess(myCoursesResponse)) {
+        toast.error("获取我的课程失败", { description: myCoursesResponse.message });
+        return;
+      }
+
+      if (!isApiSuccess(allCoursesResponse)) {
+        toast.error("获取课程列表失败", { description: allCoursesResponse.message });
+        return;
+      }
+
+      // 转换用户数据
+      const userData = convertApiUserToLocal(profileResponse.data);
+
+      // 转换我的课程数据
+      const myCoursesData = myCoursesResponse.data.map(convertApiEnrollmentToLocal);
+
+      // 转换所有课程数据
+      const allCoursesData = allCoursesResponse.data.courses.map(convertApiCourseToLocal);
+
+      // 直接从enrollment数据创建课程进度信息（使用新的stats字段）
+      const courseProgress = myCoursesData.map(convertEnrollmentToProgress);
+
+      // 计算学习统计（使用新的stats数据）
+      const studyStats = {
+        videosWatched: myCoursesData.reduce((sum, enrollment) => sum + (enrollment.stats?.viewed_videos || 0), 0),
+        exercisesCompleted: 0, // 暂未提供练习统计
+        pdfsRead: myCoursesData.reduce((sum, enrollment) => sum + (enrollment.stats?.viewed_documents || 0), 0),
+        studyHours: courseProgress.reduce((sum, course) => sum + (course.studyHours || 0), 0)
+      };
+
+      // 更新状态
+      setDashboardData({
+        user: {
+          ...userData,
+          studyStats,
+          enrolledCourses: myCoursesData.map(c => c.course.id),
+          courseProgress
+        },
+        myCourses: myCoursesData,
+        allCourses: allCoursesData,
+        courseProgress,
+        isLoading: false
+      });
+
+    } catch (error) {
+      console.error("获取仪表板数据失败:", error);
+      toast.error("加载数据失败", { description: "请刷新页面重试" });
+      setDashboardData(prev => ({ ...prev, isLoading: false }));
+    }
+  };
+
+  // 使用ref防止在严格模式下重复调用API
+  const initialFetchRef = useRef<string | null>(null);
+  
+  // 组件挂载时获取数据
+  useEffect(() => {
+    // authUser变化或首次加载时获取数据
+    // 避免在严格模式下重复调用API
+    if (authUser && (!initialFetchRef.current || initialFetchRef.current !== authUser.id)) {
+      initialFetchRef.current = authUser.id;
+      fetchDashboardData();
+    }
+  }, [authUser]);
+
+  // 检查用户是否有课程访问权限
+  const hasAccess = (courseId: string): boolean => {
+    return dashboardData.user?.enrolledCourses?.includes(courseId) || false;
+  };
 
   // 显示权限提示
   const showAccessDeniedAlert = (courseName: string) => {
     toast.error(`您没有权限访问《${courseName}》课程。`, {
-      description: "请联系管理员或升级您的账户以获取访问权限。",
+      description: "请联系管理员或报名该课程以获取访问权限。",
       duration: 4000,
     });
   };
+
+  // 显示选课确认对话框
+  const showEnrollDialog = (courseId: string, courseName: string) => {
+    setEnrollDialog({
+      isOpen: true,
+      courseId,
+      courseName
+    });
+  };
+
+  // 确认选课处理
+  const confirmEnrollCourse = async () => {
+    const { courseId, courseName } = enrollDialog;
+    
+    try {
+      setEnrollDialog(prev => ({ ...prev, isOpen: false }));
+      
+      const response = await apiService.enrollCourse(parseInt(courseId));
+      if (isApiSuccess(response)) {
+        toast.success(`成功选择《${courseName}》课程！`);
+        // 重新获取数据
+        fetchDashboardData();
+      } else {
+        toast.error("选课失败", { description: response.message });
+      }
+    } catch (error) {
+      console.error("选课失败:", error);
+      toast.error("选课失败", { description: "请稍后重试" });
+    }
+  };
+
+  // 取消选课
+  const cancelEnrollCourse = () => {
+    setEnrollDialog({
+      isOpen: false,
+      courseId: '',
+      courseName: ''
+    });
+  };
+
+  // 加载状态
+  if (dashboardData.isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <span className="ml-2 text-lg">加载中...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 用户数据不存在
+  if (!dashboardData.user) {
+    return (
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg text-gray-600 mb-2">无法获取用户信息</h3>
+            <p className="text-gray-500 text-center mb-4">请重新登录</p>
+            <Button onClick={() => window.location.reload()}>刷新页面</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const user = dashboardData.user;
+  const { courseProgress, myCourses, allCourses } = dashboardData;
 
   const features = [
     {
@@ -47,7 +241,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       icon: Play,
       action: () => onNavigate('videos'),
       buttonText: "开始学习",
-      subtitle: `${enrolledCourses.length} 门已报名课程`
+      subtitle: `${user.enrolledCourses?.length || 0} 门已报名课程`
     },
     {
       title: "练习测试",
@@ -82,21 +276,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
     .slice(0, 2);
 
-  // 获取已报名的课程信息
-  const enrolledCourseDetails = availableCourses.filter(course => 
-    enrolledCourses.includes(course.id)
-  );
-
-  // 按权限状态排序课程：有权限的在前，无权限的在后
-  const sortedCourses = [...availableCourses].sort((a, b) => {
+  // 按权限状态排序课程：已选课程在前，未选课程在后
+  const sortedCourses = [...allCourses].sort((a, b) => {
     const aHasAccess = hasAccess(a.id);
     const bHasAccess = hasAccess(b.id);
     
-    // 如果权限状态不同，有权限的排在前面
     if (aHasAccess && !bHasAccess) return -1;
     if (!aHasAccess && bHasAccess) return 1;
-    
-    // 如果权限状态相同，按原始顺序排列
     return 0;
   });
 
@@ -145,7 +331,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </Avatar>
           <div>
             <h1 className="text-3xl">{getGreeting()}，{user.fullName}！</h1>
-            <p className="text-gray-600">继续您的职业培训学习</p>
           </div>
         </div>
       </div>
@@ -282,8 +467,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       </p>
                       
                       <div className="text-xs text-gray-500 space-y-1 mb-3">
-                        <div>预计学时：{course.estimatedHours}小时</div>
-                        <div>视频：{course.totalVideos}个 | 练习：{course.totalExercises}套</div>
+                        <div>课程级别：{course.level}</div>
+                        <div>创建时间：{new Date(course.created_at).toLocaleDateString()}</div>
                       </div>
 
                       {/* 已报名课程显示学习进度 */}
@@ -302,15 +487,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         </div>
                       )}
 
-                      {/* 未报名课程显示权限提示 */}
+                      {/* 未报名课程显示选课按钮 */}
                       {!hasUserAccess && (
-                        <div 
-                          className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded cursor-pointer hover:bg-amber-100 transition-colors"
-                          onClick={() => showAccessDeniedAlert(course.name)}
-                        >
+                        <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
                           <div className="flex items-center space-x-2">
-                            <AlertCircle className="h-4 w-4 text-amber-600" />
-                            <span className="text-xs text-amber-700">点击了解详情</span>
+                            <AlertCircle className="h-4 w-4 text-blue-600" />
+                            <span className="text-xs text-blue-700">点击下方按钮选择此课程</span>
                           </div>
                         </div>
                       )}
@@ -327,12 +509,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         ) : (
                           <Button 
                             size="sm" 
-                            variant="outline" 
                             className="flex-1"
-                            onClick={() => showAccessDeniedAlert(course.name)}
+                            onClick={() => showEnrollDialog(course.id, course.name)}
                           >
-                            <Lock className="h-3 w-3 mr-1" />
-                            查看详情
+                            选择课程
                           </Button>
                         )}
                       </div>
@@ -345,18 +525,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </TabsContent>
 
         <TabsContent value="courses" className="space-y-6">
-          {courseProgress.filter(course => hasAccess(course.courseId)).length > 0 ? (
+          {courseProgress.length > 0 ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xl">我的课程进度</h3>
                   <p className="text-gray-600">查看所有已报名课程的详细学习进度</p>
                 </div>
+                <Button onClick={fetchDashboardData} variant="outline">
+                  刷新数据
+                </Button>
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {courseProgress
-                  .filter(course => hasAccess(course.courseId))
                   .sort((a, b) => b.completionPercentage - a.completionPercentage)
                   .map(course => (
                     <CourseProgressCard
@@ -371,9 +553,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <GraduationCap className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg text-gray-600 mb-2">还没有开始学习课程</h3>
+                <h3 className="text-lg text-gray-600 mb-2">还没有选择任何课程</h3>
                 <p className="text-gray-500 text-center mb-4">
-                  请联系课程顾问报名您感兴趣的职业培训课程
+                  请选择您感兴趣的职业培训课程开始学习
                 </p>
                 <div className="flex space-x-4">
                   <Button onClick={() => onNavigate('videos')}>
@@ -381,9 +563,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   </Button>
                   <Button 
                     variant="outline" 
-                    onClick={() => window.open('tel:400-123-4567')}
+                    onClick={fetchDashboardData}
                   >
-                    联系课程顾问
+                    刷新数据
                   </Button>
                 </div>
               </CardContent>
@@ -391,6 +573,28 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* 选课确认对话框 */}
+      <AlertDialog open={enrollDialog.isOpen} onOpenChange={(open) => !open && cancelEnrollCourse()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认选择课程</AlertDialogTitle>
+            <AlertDialogDescription>
+              您确定要选择《{enrollDialog.courseName}》课程吗？
+              <br />
+              选择后您将可以访问该课程的所有学习资料和练习内容。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelEnrollCourse}>
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmEnrollCourse}>
+              确认选择
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
