@@ -135,6 +135,173 @@ export interface OSSSignedUrlResponse {
   expires_in: number;
 }
 
+// ==================== 练习和考试相关类型 ====================
+
+// 题目类型
+export interface Question {
+  question_id: number;
+  question_type: 'single_choice' | 'multiple_choice' | 'true_false' | 'fill_in_blank' | 'short_answer';
+  content: string;
+  options?: Record<string, string>;
+  difficulty: number;
+  creator?: User;
+}
+
+// 考试题目
+export interface ExamQuestion {
+  exam_question_id: number;
+  question: Question;
+  score: number;
+  order_index: number;
+}
+
+// 考试题目
+export interface ExamQuestion {
+  exam_question_id: number;
+  question: Question;
+  score: number;
+  order_index: number;
+}
+
+// 考试/练习基本信息
+export interface Exam {
+  exam_id: number;
+  title: string;
+  exam_type: 'exercise' | 'final';
+  duration_minutes: number;
+  total_score: number;
+  passing_score: number;
+  creator?: User;
+  status: string;
+  course: Course;
+  total_questions: number;
+  is_participated: boolean;
+}
+
+// 考试列表响应
+export interface ApiExamListResponse {
+  exams: Exam[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+// 考试详情响应
+export interface ApiExamDetail {
+  exam_id: number;
+  title: string;
+  exam_type: 'exercise' | 'final';
+  duration_minutes: number;
+  total_score: number;
+  passing_score: number;
+  creator?: User;
+  status: string;
+  course: Course;
+  questions: ExamQuestion[];
+  is_participated: boolean;
+}
+
+// 练习详情响应（继承考试详情）
+export interface ExerciseDetail extends ApiExamDetail {}
+
+// 答题记录
+export interface AnswerRecord {
+  answer_id: number;
+  question: Question;
+  student_answer?: string;
+  is_correct?: boolean;
+  score_awarded?: number;
+}
+
+// 考试记录
+export interface ExamAttempt {
+  attempt_id: number;
+  exam: Exam;
+  start_time: string;
+  submit_time?: string;
+  score?: number;
+  status: 'in_progress' | 'submitted' | 'graded';
+}
+
+// 考试记录列表响应
+export interface ApiExamAttemptListResponse {
+  attempts: ExamAttempt[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+// 考试记录详情
+export interface ApiExamAttemptDetail {
+  attempt_id: number;
+  exam: Exam;
+  start_time: string;
+  submit_time?: string;
+  score?: number;
+  status: 'in_progress' | 'submitted' | 'graded';
+  answer_records: AnswerRecord[];
+}
+
+// 练习统计
+export interface ApiExerciseStats {
+  total_exercises: number;
+  completed_exercises: number;
+  completion_rate: number;
+  exercises: {
+    exam_id: number;
+    exam__title: string;
+    exam__course__title: string;
+    attempt_count: number;
+    best_score: number;
+    latest_attempt: string;
+  }[];
+}
+
+// 考试统计
+export interface ApiExamStats {
+  total_exams: number;
+  passed_exams: number;
+  pass_rate: number;
+  exams: {
+    exam_id: number;
+    exam__title: string;
+    exam__course__title: string;
+    attempt_count: number;
+    best_score: number;
+    latest_attempt: string;
+  }[];
+}
+
+export interface QuestionResult {
+  question_id: number;
+  question_content: string;
+  question_type: string;
+  options?: Record<string, string>;
+  correct_answer: string;
+  student_answer: string;
+  is_correct: boolean;
+  score_awarded: number;
+  total_score: number;
+  analysis?: string;
+}
+
+export interface SubmitResult {
+  attempt_id: number;
+  total_score: number;
+  max_score: number;
+  pass_status: boolean;
+  question_results: QuestionResult[];
+  summary: {
+    total_questions: number;
+    correct_count: number;
+    wrong_count: number;
+    accuracy_rate: number;
+    pass_score: number;
+  };
+}
+
 // HTTP 请求工具函数
 async function apiRequest<T = any>(
   endpoint: string,
@@ -329,6 +496,115 @@ export const apiService = {
   // 获取OSS文件签名URL
   async getOSSSignedUrl(key: string): Promise<ApiResponse<OSSSignedUrlResponse>> {
     return apiRequest(`/oss/signed-url?key=${encodeURIComponent(key)}`);
+  },
+
+  // ==================== 练习和考试相关 ====================
+  
+  // 获取练习列表
+  async getExercises(params?: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    course_id?: number;
+  }): Promise<ApiResponse<ApiExamListResponse>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params) {
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.per_page) queryParams.append('per_page', params.per_page.toString());
+      if (params.search) queryParams.append('search', params.search);
+      if (params.course_id) queryParams.append('course_id', params.course_id.toString());
+    }
+    
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/exercises?${queryString}` : '/exercises';
+    
+    return apiRequest(endpoint);
+  },
+
+  // 获取考试列表
+  async getExams(params?: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    course_id?: number;
+  }): Promise<ApiResponse<ApiExamListResponse>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params) {
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.per_page) queryParams.append('per_page', params.per_page.toString());
+      if (params.search) queryParams.append('search', params.search);
+      if (params.course_id) queryParams.append('course_id', params.course_id.toString());
+    }
+    
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/exams?${queryString}` : '/exams';
+    
+    return apiRequest(endpoint);
+  },
+
+  // 获取练习详情
+  async getExerciseDetail(exerciseId: number): Promise<ApiResponse<ApiExamDetail>> {
+    return apiRequest(`/exercises/${exerciseId}`);
+  },
+
+  // 获取考试详情
+  async getExamDetail(examId: number): Promise<ApiResponse<ApiExamDetail>> {
+    return apiRequest(`/exams/${examId}`);
+  },
+
+  // 获取我的考试记录
+  async getMyExamAttempts(params?: {
+    page?: number;
+    per_page?: number;
+    exam_type?: string;
+  }): Promise<ApiResponse<ApiExamAttemptListResponse>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params) {
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.per_page) queryParams.append('per_page', params.per_page.toString());
+      if (params.exam_type) queryParams.append('exam_type', params.exam_type);
+    }
+    
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/my-exam-attempts?${queryString}` : '/my-exam-attempts';
+    
+    return apiRequest(endpoint);
+  },
+
+  // 获取考试记录详情
+  async getExamAttemptDetail(attemptId: number): Promise<ApiResponse<ApiExamAttemptDetail>> {
+    return apiRequest(`/my-exam-attempts/${attemptId}`);
+  },
+
+  // 获取我的练习统计
+  async getMyExerciseStats(): Promise<ApiResponse<ApiExerciseStats>> {
+    return apiRequest('/my-exercises');
+  },
+
+  // 获取我的考试统计
+  async getMyExamStats(): Promise<ApiResponse<ApiExamStats>> {
+    return apiRequest('/my-exams');
+  },
+
+  // ==================== 练习和考试提交 ====================
+  
+  // 提交练习答案
+  async submitExercise(exerciseId: number, answers: Array<{questionId: number, answer: string}>): Promise<ApiResponse<SubmitResult>> {
+    return apiRequest(`/exercises/${exerciseId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ answers }),
+    });
+  },
+
+  // 提交考试答案
+  async submitExam(examId: number, answers: Array<{questionId: number, answer: string}>): Promise<ApiResponse<ExamAttempt>> {
+    return apiRequest(`/exams/${examId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ answers }),
+    });
   },
 
   // ==================== 测试相关 ====================

@@ -188,3 +188,131 @@ export function convertEnrollmentToProgress(enrollment: any) {
     completionPercentage
   };
 } 
+
+// ==================== 练习和考试相关类型 ====================
+
+// 题目类型
+export interface ApiQuestion {
+  question_id: number;
+  question_type: 'single_choice' | 'multiple_choice' | 'true_false' | 'fill_in_blank' | 'short_answer';
+  content: string;
+  options?: Record<string, string>;
+  difficulty: number;
+  creator?: ApiUser;
+}
+
+// 考试题目
+export interface ApiExamQuestion {
+  exam_question_id: number;
+  question: ApiQuestion;
+  score: number;
+  order_index: number;
+}
+
+// 考试/练习基本信息
+export interface ApiExam {
+  exam_id: number;
+  title: string;
+  exam_type: 'exercise' | 'final';
+  duration_minutes: number;
+  total_score: number;
+  passing_score: number;
+  creator?: ApiUser;
+  status: string;
+  course: ApiCourse;
+  total_questions: number;
+  is_participated: boolean;
+}
+
+// 考试列表响应
+export interface ApiExamListResponse {
+  exams: ApiExam[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+// 考试详情响应
+export interface ApiExamDetail {
+  exam_id: number;
+  title: string;
+  exam_type: 'exercise' | 'final';
+  duration_minutes: number;
+  total_score: number;
+  passing_score: number;
+  creator?: ApiUser;
+  status: string;
+  course: ApiCourse;
+  questions: ApiExamQuestion[];
+  is_participated: boolean;
+}
+
+// 答题记录
+export interface ApiAnswerRecord {
+  answer_id: number;
+  question: ApiQuestion;
+  student_answer?: string;
+  is_correct?: boolean;
+  score_awarded?: number;
+}
+
+// 考试记录
+export interface ApiExamAttempt {
+  attempt_id: number;
+  exam: ApiExam;
+  start_time: string;
+  submit_time?: string;
+  score?: number;
+  status: 'in_progress' | 'submitted' | 'graded';
+}
+
+// 考试记录列表响应
+export interface ApiExamAttemptListResponse {
+  attempts: ApiExamAttempt[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+// 考试记录详情
+export interface ApiExamAttemptDetail {
+  attempt_id: number;
+  exam: ApiExam;
+  start_time: string;
+  submit_time?: string;
+  score?: number;
+  status: 'in_progress' | 'submitted' | 'graded';
+  answer_records: ApiAnswerRecord[];
+}
+
+// 练习统计
+export interface ApiExerciseStats {
+  total_exercises: number;
+  completed_exercises: number;
+  completion_rate: number;
+  exercises: {
+    exam_id: number;
+    exam__title: string;
+    exam__course__title: string;
+    attempt_count: number;
+    best_score: number;
+    latest_attempt: string;
+  }[];
+}
+
+// 考试统计
+export interface ApiExamStats {
+  total_exams: number;
+  passed_exams: number;
+  pass_rate: number;
+  exams: {
+    exam_id: number;
+    exam__title: string;
+    exam__course__title: string;
+    attempt_count: number;
+    best_score: number;
+    latest_attempt: string;
+  }[];
+} 

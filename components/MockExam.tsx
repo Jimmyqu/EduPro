@@ -1,934 +1,536 @@
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/router";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { Progress } from "./ui/progress";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import { Checkbox } from "./ui/checkbox";
-import { Label } from "./ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
-import { ArrowLeft, Clock, FileText, Trophy, AlertCircle, CheckCircle2, XCircle, Eye, Calendar, Timer, Users, Target, BookOpen, Award, History, Play, Pause, RotateCcw, Save, RefreshCw, Brain, ChevronLeft, ChevronRight } from "lucide-react";
-import { useAuth, availableCourses, MockExamProgress, MockExamAttempt } from "../contexts/AuthContext";
+import { Input } from "./ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { 
+  ArrowLeft, 
+  BookOpen, 
+  Clock, 
+  Trophy, 
+  Search,
+  Filter,
+  Eye,
+  CheckCircle,
+  XCircle,
+  Calendar,
+  BarChart3,
+  AlertTriangle,
+  FileText
+} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { apiService, isApiSuccess, Exam, ExamAttempt, ApiExamStats } from "../lib/api";
 import { toast } from "sonner";
 
-interface MockExamQuestion {
-  id: string;
-  question: string;
-  type: "single-choice" | "multiple-choice";
-  options: string[];
-  correctAnswer: number | number[];
-  explanation: string;
-  difficulty: "Easy" | "Medium" | "Hard";
-  subject: string;
-}
-
-interface MockExam {
-  id: string;
-  title: string;
-  description: string;
-  courseId: string;
-  courseName: string;
-  timeLimit: number;
-  totalQuestions: number;
-  passingScore: number;
-  questions: MockExamQuestion[];
-  type: 'practice';
-}
-
-interface MockExamHubProps {
+interface MockExamProps {
   onBack: () => void;
 }
 
-type ExamState = 'courseList' | 'examList' | 'preparation' | 'taking' | 'completed' | 'review';
+export function MockExam({ onBack }: MockExamProps) {
+  const router = useRouter();
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [myAttempts, setMyAttempts] = useState<ExamAttempt[]>([]);
+  const [stats, setStats] = useState<ApiExamStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [currentTab, setCurrentTab] = useState("exams");
+  const { user } = useAuth();
 
-const safeCalculate = (numerator: number, denominator: number, fallback: number = 0): number => {
-  if (!isFinite(numerator) || !isFinite(denominator) || denominator === 0) {
-    return fallback;
-  }
-  const result = numerator / denominator;
-  return isFinite(result) ? result : fallback;
-};
+  // 获取考试列表
+  const fetchExams = async (page = 1, search = "", courseId?: number) => {
+    try {
+      setLoading(true);
+      
+      const params: any = {
+        page,
+        per_page: 12,
+      };
+      
+      if (search.trim()) {
+        params.search = search.trim();
+      }
+      
+      if (courseId && courseId > 0) {
+        params.course_id = courseId;
+      }
+      
+      const response = await apiService.getExams(params);
+      
+      if (isApiSuccess(response)) {
+        setExams(response.data.exams);
+        setTotalPages(response.data.total_pages);
+        setTotal(response.data.total);
+        setCurrentPage(page);
+      } else {
+        toast.error("获取考试列表失败", { description: response.message });
+      }
+    } catch (error) {
+      console.error("获取考试列表失败:", error);
+      toast.error("获取考试列表失败", { description: "请稍后重试" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-const safePercentage = (numerator: number, denominator: number): number => {
-  const result = safeCalculate(numerator, denominator, 0) * 100;
-  return Math.round(isFinite(result) ? result : 0);
-};
+  // 获取我的考试记录
+  const fetchMyAttempts = async () => {
+    try {
+      const response = await apiService.getMyExamAttempts({ 
+        exam_type: 'final',
+        per_page: 50 
+      });
+      
+      if (isApiSuccess(response)) {
+        setMyAttempts(response.data.attempts);
+      } else {
+        toast.error("获取考试记录失败", { description: response.message });
+      }
+    } catch (error) {
+      console.error("获取考试记录失败:", error);
+    }
+  };
 
-const safeNumber = (value: any, fallback: number = 0): number => {
-  const num = Number(value);
-  return isFinite(num) ? num : fallback;
-};
+  // 获取统计信息
+  const fetchStats = async () => {
+    try {
+      const response = await apiService.getMyExamStats();
+      
+      if (isApiSuccess(response)) {
+        setStats(response.data);
+      } else {
+        console.error("获取统计信息失败:", response.message);
+      }
+    } catch (error) {
+      console.error("获取统计信息失败:", error);
+    }
+  };
 
-const isAnswerCorrect = (userAnswer: any, correctAnswer: number | number[]): boolean => {
-  if (Array.isArray(correctAnswer)) {
-    if (!Array.isArray(userAnswer)) return false;
-    if (userAnswer.length !== correctAnswer.length) return false;
-    const sortedUser = [...userAnswer].sort((a, b) => a - b);
-    const sortedCorrect = [...correctAnswer].sort((a, b) => a - b);
-    return sortedUser.every((answer, index) => answer === sortedCorrect[index]);
-  } else {
-    return userAnswer === correctAnswer;
-  }
-};
-
-export function MockExam({ onBack }: MockExamHubProps) {
-  const [examState, setExamState] = useState<ExamState>('courseList');
-  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
-  const [selectedExam, setSelectedExam] = useState<MockExam | null>(null);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<any[]>([]);
-  const [currentAnswer, setCurrentAnswer] = useState<any>(null);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [currentAttempt, setCurrentAttempt] = useState<MockExamAttempt | null>(null);
-  const [currentProgress, setCurrentProgress] = useState<MockExamProgress | null>(null);
-  const [showTimeWarning, setShowTimeWarning] = useState(false);
-  const [showPauseDialog, setShowPauseDialog] = useState(false);
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const { 
-    user, 
-    hasAccess, 
-    saveMockExamProgress, 
-    getMockExamProgress, 
-    deleteMockExamProgress, 
-    saveMockExamAttempt, 
-    getMockExamAttempts,
-    getAllMockExamProgress
-  } = useAuth();
-
-  // 定时器效果
+  // 初始化数据
+  const initialFetchRef = useRef(false);
+  
   useEffect(() => {
-    if (isTimerRunning && timeLeft > 0) {
-      timerRef.current = setTimeout(() => {
-        const newTimeLeft = timeLeft - 1;
-        setTimeLeft(newTimeLeft);
-        
-        // 保存进度
-        if (selectedExam && currentProgress) {
-          const updatedProgress = {
-            ...currentProgress,
-            timeLeft: newTimeLeft,
-            answers: answers,
-            currentQuestionIndex: currentQuestionIndex
-          };
-          saveMockExamProgress(updatedProgress);
-        }
-        
-        // 时间警告
-        if (newTimeLeft === 300) { // 5分钟警告
-          setShowTimeWarning(true);
-        }
-        
-        // 时间到自动提交
-        if (newTimeLeft === 0) {
-          handleTimeUp();
-        }
-      }, 1000);
+    if (!initialFetchRef.current) {
+      initialFetchRef.current = true;
+      Promise.all([
+        fetchExams(),
+        fetchMyAttempts(),
+        fetchStats()
+      ]);
     }
-    
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, [isTimerRunning, timeLeft, selectedExam, currentProgress, answers, currentQuestionIndex]);
+  }, []);
 
-  const generateMockExams = (): MockExam[] => {
-    const exams: MockExam[] = [];
-    
-    const examTemplates = {
-      'health-manager': [
-        { id: 'health-manager-practice-1', title: '健康管理师模拟考试（一）', description: '涵盖健康管理基础理论、风险评估、健康促进等核心知识点', timeLimit: 120, totalQuestions: 100, passingScore: 60, type: 'practice' as const }
-      ],
-      'mental-health-counselor': [
-        { id: 'mental-health-practice-1', title: '心理健康指导模拟考试（一）', description: '心理学基础、咨询理论、评估方法等综合测试', timeLimit: 120, totalQuestions: 100, passingScore: 60, type: 'practice' as const }
-      ],
-      'rehabilitation-therapist': [
-        { id: 'rehabilitation-practice-1', title: '康复理疗师模拟考试（一）', description: '康复医学基础、物理治疗、运动治疗综合考核', timeLimit: 120, totalQuestions: 100, passingScore: 60, type: 'practice' as const }
-      ],
-      'childcare-specialist': [
-        { id: 'childcare-practice-1', title: '育婴员模拟考试（一）', description: '婴幼儿发育特点、营养需求、基础护理技能', timeLimit: 90, totalQuestions: 80, passingScore: 60, type: 'practice' as const }
-      ]
-    };
-
-    const questionTemplates = [
-      { q: "健康管理的核心理念是", type: "single-choice", opts: ["治疗疾病", "预防为主，防治结合", "药物治疗", "手术治疗"], correct: 1, exp: "健康管理强调预防为主、防治结合的理念。", subject: "健康管理基础" },
-      { q: "健康管理的主要内容包括哪些", type: "multiple-choice", opts: ["健康评估", "健康咨询", "健康干预", "疾病治疗"], correct: [0, 1, 2], exp: "健康管理主要包括健康评估、健康咨询和健康干预。", subject: "健康管理" }
-    ];
-
-    availableCourses.forEach(course => {
-      const courseTemplates = examTemplates[course.id as keyof typeof examTemplates];
-      if (courseTemplates) {
-        courseTemplates.forEach(template => {
-          const questions: MockExamQuestion[] = [];
-          
-          for (let i = 0; i < template.totalQuestions; i++) {
-            const templateIndex = i % questionTemplates.length;
-            const questionTemplate = questionTemplates[templateIndex];
-            
-            questions.push({
-              id: `${template.id}-q${i + 1}`,
-              question: `${questionTemplate.q}？（第${i + 1}题）`,
-              type: questionTemplate.type as "single-choice" | "multiple-choice",
-              options: questionTemplate.opts,
-              correctAnswer: questionTemplate.correct,
-              explanation: questionTemplate.exp,
-              difficulty: i % 3 === 0 ? "Hard" : i % 3 === 1 ? "Medium" : "Easy",
-              subject: questionTemplate.subject
-            });
-          }
-
-          exams.push({ ...template, courseId: course.id, courseName: course.name, questions });
-        });
-      }
-    });
-
-    return exams;
+  // 搜索处理
+  const handleSearch = () => {
+    setCurrentPage(1);
+    const courseId = selectedCourse === "all" ? undefined : parseInt(selectedCourse);
+    fetchExams(1, searchTerm, courseId);
   };
 
-  const mockExams = generateMockExams();
-  
-  // 获取用户已报名的课程
-  const enrolledCourses = availableCourses.filter(course => 
-    user?.enrolledCourses?.includes(course.id)
-  );
-  
-  const getCourseExams = (courseId: string) => mockExams.filter(exam => exam.courseId === courseId);
-
-  const handleSelectCourse = (courseId: string) => {
-    setSelectedCourse(courseId);
-    setExamState('examList');
+  // 重置搜索
+  const handleReset = () => {
+    setSearchTerm("");
+    setSelectedCourse("all");
+    setCurrentPage(1);
+    fetchExams(1);
   };
 
-  const handleBackToCourseList = () => {
-    setSelectedCourse(null);
-    setExamState('courseList');
+  // 分页处理
+  const handlePageChange = (page: number) => {
+    const courseId = selectedCourse === "all" ? undefined : parseInt(selectedCourse);
+    fetchExams(page, searchTerm, courseId);
   };
 
-  const handleStartExam = (exam: MockExam) => {
-    const existingProgress = getMockExamProgress(exam.id);
-    
-    if (existingProgress && !existingProgress.isCompleted) {
-      // 继续之前的考试
-      setSelectedExam(exam);
-      setCurrentQuestionIndex(existingProgress.currentQuestionIndex);
-      setAnswers(existingProgress.answers);
-      setCurrentAnswer(existingProgress.answers[existingProgress.currentQuestionIndex] || null);
-      setTimeLeft(existingProgress.timeLeft);
-      setCurrentProgress(existingProgress);
-      setExamState('taking');
-      setIsTimerRunning(true);
-    } else {
-      // 开始新考试
-      const newProgress: MockExamProgress = {
-        id: `progress-${exam.id}-${Date.now()}`,
-        examId: exam.id,
-        examTitle: exam.title,
-        courseId: exam.courseId,
-        courseName: exam.courseName,
-        startTime: new Date().toISOString(),
-        lastUpdateTime: new Date().toISOString(),
-        currentQuestionIndex: 0,
-        answers: new Array(exam.totalQuestions).fill(undefined),
-        timeLeft: exam.timeLimit * 60, // 转换为秒
-        totalTimeLimit: exam.timeLimit * 60,
-        isCompleted: false,
-        isPaused: false,
-        totalQuestions: exam.totalQuestions
-      };
-      
-      setSelectedExam(exam);
-      setCurrentQuestionIndex(0);
-      setAnswers(new Array(exam.totalQuestions).fill(undefined));
-      setCurrentAnswer(null);
-      setTimeLeft(exam.timeLimit * 60);
-      setCurrentProgress(newProgress);
-      saveMockExamProgress(newProgress);
-      setExamState('taking');
-      setIsTimerRunning(true);
+  // 查看考试详情
+  const handleViewExam = (examId: number) => {
+    // 跳转到考试详情页面
+    router.push(`/exams/${examId}`);
+  };
+
+  // 开始考试
+  const handleStartExam = (examId: number) => {
+    // 跳转到考试详情页面
+    router.push(`/exams/${examId}`);
+  };
+
+  // 获取考试状态显示
+  const getExamStatus = (exam: Exam) => {
+    if (exam.is_participated) {
+      return (
+        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          已参加
+        </Badge>
+      );
     }
+    return (
+      <Badge variant="outline">
+        <Clock className="h-3 w-3 mr-1" />
+        未参加
+      </Badge>
+    );
   };
 
-  const handleContinueExam = (progress: MockExamProgress) => {
-    const exam = mockExams.find(e => e.id === progress.examId);
-    if (exam) {
-      setSelectedExam(exam);
-      setCurrentQuestionIndex(progress.currentQuestionIndex);
-      setAnswers(progress.answers);
-      setCurrentAnswer(progress.answers[progress.currentQuestionIndex] || null);
-      setTimeLeft(progress.timeLeft);
-      setCurrentProgress(progress);
-      setExamState('taking');
-      setIsTimerRunning(true);
-    }
-  };
-
-  const handleAnswerSelect = (answer: any) => {
-    setCurrentAnswer(answer);
-    const newAnswers = [...answers];
-    newAnswers[currentQuestionIndex] = answer;
-    setAnswers(newAnswers);
-    
-    // 保存进度
-    if (selectedExam && currentProgress) {
-      const updatedProgress = {
-        ...currentProgress,
-        answers: newAnswers,
-        lastUpdateTime: new Date().toISOString()
-      };
-      setCurrentProgress(updatedProgress);
-      saveMockExamProgress(updatedProgress);
-    }
-  };
-
-  const handleNextQuestion = () => {
-    if (selectedExam && currentQuestionIndex < selectedExam.totalQuestions - 1) {
-      const nextIndex = currentQuestionIndex + 1;
-      setCurrentQuestionIndex(nextIndex);
-      setCurrentAnswer(answers[nextIndex] || null);
-      
-      // 保存进度
-      if (currentProgress) {
-        const updatedProgress = {
-          ...currentProgress,
-          currentQuestionIndex: nextIndex,
-          lastUpdateTime: new Date().toISOString()
-        };
-        setCurrentProgress(updatedProgress);
-        saveMockExamProgress(updatedProgress);
-      }
-    }
-  };
-
-  const handlePreviousQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      const prevIndex = currentQuestionIndex - 1;
-      setCurrentQuestionIndex(prevIndex);
-      setCurrentAnswer(answers[prevIndex] || null);
-      
-      // 保存进度
-      if (currentProgress) {
-        const updatedProgress = {
-          ...currentProgress,
-          currentQuestionIndex: prevIndex,
-          lastUpdateTime: new Date().toISOString()
-        };
-        setCurrentProgress(updatedProgress);
-        saveMockExamProgress(updatedProgress);
-      }
-    }
-  };
-
-  const handlePauseExam = () => {
-    setIsTimerRunning(false);
-    setShowPauseDialog(true);
-  };
-
-  const handleResumeExam = () => {
-    setIsTimerRunning(true);
-    setShowPauseDialog(false);
-  };
-
-  const handleSubmitExam = () => {
-    if (!selectedExam || !currentProgress) return;
-    
-    setIsTimerRunning(false);
-    
-    // 计算得分
-    const answeredQuestions = answers.filter(a => a !== undefined && a !== null);
-    const correctAnswers = answers.reduce((count, answer, index) => {
-      if (answer !== undefined && answer !== null) {
-        return count + (isAnswerCorrect(answer, selectedExam.questions[index].correctAnswer) ? 1 : 0);
-      }
-      return count;
-    }, 0);
-    
-    const score = answeredQuestions.length > 0 ? Math.round((correctAnswers / answeredQuestions.length) * 100) : 0;
-    const passed = score >= selectedExam.passingScore;
-    
-    // 保存考试记录
-    const attempt: MockExamAttempt = {
-      id: `attempt-${selectedExam.id}-${Date.now()}`,
-      examId: selectedExam.id,
-      examTitle: selectedExam.title,
-      courseId: selectedExam.courseId,
-      courseName: selectedExam.courseName,
-      startTime: currentProgress.startTime,
-      endTime: new Date().toISOString(),
-      timeSpent: currentProgress.totalTimeLimit - timeLeft,
-      answers: answers,
-      score: score,
-      passed: passed,
-      isCompleted: true,
-      correctAnswers: correctAnswers,
-      totalQuestions: selectedExam.totalQuestions,
-      passingScore: selectedExam.passingScore
+  // 获取考试难度标识
+  const getExamLevel = (level: string) => {
+    const colors = {
+      'beginner': 'bg-green-100 text-green-800',
+      'intermediate': 'bg-yellow-100 text-yellow-800',
+      'advanced': 'bg-red-100 text-red-800'
     };
     
-    saveMockExamAttempt(attempt);
-    
-    // 删除进度记录
-    deleteMockExamProgress(selectedExam.id);
-    
-    // 设置当前尝试和显示结果
-    setCurrentAttempt(attempt);
-    setExamState('completed');
-    setShowSubmitDialog(false);
-  };
-
-  const handleTimeUp = () => {
-    setIsTimerRunning(false);
-    toast.warning('考试时间已到！', {
-      description: "系统将自动提交您的答案。",
-      duration: 5000,
-    });
-    handleSubmitExam();
-  };
-
-  const getCourseStats = (courseId: string) => {
-    const courseExams = getCourseExams(courseId);
-    const completedExams = courseExams.filter(exam => {
-      const attempts = getMockExamAttempts(exam.id);
-      return attempts.length > 0;
-    }).length;
-    return {
-      totalExams: courseExams.length,
-      completedExams,
-      completionRate: safePercentage(completedExams, courseExams.length)
+    const labels = {
+      'beginner': '初级',
+      'intermediate': '中级',
+      'advanced': '高级'
     };
-  };
-
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  // 课程列表界面 - 只显示已报名的课程
-  if (examState === 'courseList') {
-    const ongoingProgress = getAllMockExamProgress();
 
     return (
-      <div className="p-6">
+      <Badge className={colors[level as keyof typeof colors] || 'bg-gray-100 text-gray-800'}>
+        {labels[level as keyof typeof labels] || level}
+      </Badge>
+    );
+  };
+
+  // 格式化日期
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // 获取得分颜色
+  const getScoreColor = (score: number, passingScore: number) => {
+    if (score >= passingScore) {
+      return "text-green-600";
+    } else if (score >= passingScore * 0.8) {
+      return "text-yellow-600";
+    } else {
+      return "text-red-600";
+    }
+  };
+
+  // 获取通过状态
+  const getPassStatus = (score: number, passingScore: number) => {
+    if (score >= passingScore) {
+      return (
+        <Badge variant="default" className="bg-green-100 text-green-800">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          通过
+        </Badge>
+      );
+    } else {
+      return (
+        <Badge variant="secondary" className="bg-red-100 text-red-800">
+          <XCircle className="h-3 w-3 mr-1" />
+          未通过
+        </Badge>
+      );
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <p className="text-lg text-muted-foreground mb-4">请先登录以访问考试功能</p>
+          <Button onClick={onBack}>返回首页</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-6">
+      {/* 页面头部 */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl mt-2">模拟考试</h1>
-            <p className="text-gray-600 mt-1">选择课程查看相关模拟考试</p>
+
+          <h1 className="text-3xl font-bold">模拟考试</h1>
+          <p className="text-muted-foreground">正式考试模拟，全面评估专业能力</p>
           </div>
         </div>
 
-        {ongoingProgress.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <RefreshCw className="h-5 w-5 mr-2 text-orange-600" />未完成的考试
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {ongoingProgress.map(progress => (
-                <Card key={progress.id} className="border-orange-200 bg-orange-50 flex flex-col">
-                  <CardHeader className="pb-3 flex-grow">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">{progress.examTitle}</CardTitle>
-                      <Badge variant="secondary" className="bg-orange-100 text-orange-800">进行中</Badge>
+      {/* 统计信息 */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">总考试数</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.total_exams}</div>
+              <p className="text-xs text-muted-foreground">已参加的考试</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">已通过</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{stats.passed_exams}</div>
+              <p className="text-xs text-muted-foreground">达到及格线的考试</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">通过率</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">{stats.pass_rate}%</div>
+              <p className="text-xs text-muted-foreground">考试通过率</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="exams">全部考试</TabsTrigger>
+          <TabsTrigger value="attempts">我的记录</TabsTrigger>
+        </TabsList>
+
+        {/* 全部考试 */}
+        <TabsContent value="exams" className="space-y-6">
+          {/* 搜索和筛选 */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <Input
+                    placeholder="搜索考试标题或课程名称..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleSearch} className="gap-2">
+                    <Search className="h-4 w-4" />
+                    搜索
+                  </Button>
+                  <Button variant="outline" onClick={handleReset} className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    重置
+                  </Button>
+                </div>
                     </div>
-                    <CardDescription className="text-sm">{progress.courseName}</CardDescription>
+            </CardContent>
+          </Card>
+
+          {/* 考试列表 */}
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader>
+                    <div className="h-4 bg-muted rounded w-3/4"></div>
+                    <div className="h-3 bg-muted rounded w-1/2"></div>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span>进度</span><span>{progress.currentQuestionIndex + 1}/{progress.totalQuestions}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>剩余时间</span><span className="text-orange-600">{formatTime(progress.timeLeft)}</span>
-                      </div>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="h-3 bg-muted rounded"></div>
+                      <div className="h-3 bg-muted rounded w-2/3"></div>
                     </div>
-                    <Progress value={safePercentage(progress.currentQuestionIndex + 1, progress.totalQuestions)} className="h-2" />
-                    <Button className="w-full" size="sm" onClick={() => handleContinueExam(progress)}>
-                      <Play className="h-4 w-4 mr-2" />继续考试
-                    </Button>
                   </CardContent>
                 </Card>
               ))}
             </div>
-          </div>
-        )}
-
-        <div>
-          <h2 className="text-xl font-semibold mb-4">选择课程</h2>
+          ) : exams.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">暂无考试</h3>
+                <p className="text-muted-foreground">当前没有找到相关考试，请稍后再试</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {enrolledCourses.map(course => {
-              const stats = getCourseStats(course.id);
-              
-              return (
-                <Card 
-                  key={course.id} 
-                  className="hover:shadow-lg transition-shadow cursor-pointer flex flex-col" 
-                  onClick={() => handleSelectCourse(course.id)}
-                >
-                  <div className="relative">
-                    <div className="h-32 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-t-lg flex items-center justify-center">
-                      <div className="text-center text-white">
-                        <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-2 mx-auto">
-                          <BookOpen className="h-6 w-6" />
+                {exams.map((exam) => (
+                  <Card key={exam.exam_id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg line-clamp-2">{exam.title}</CardTitle>
+                          <CardDescription className="mt-1 flex items-center gap-2">
+                            <span>{exam.course.title}</span>
+                            {getExamLevel(exam.course.level)}
+                          </CardDescription>
                         </div>
-                        <div className="text-sm opacity-90">{course.category}</div>
+                        {getExamStatus(exam)}
                       </div>
-                    </div>
-                    <div className="absolute top-4 right-4">
-                      <Badge variant="secondary">
-                        {getCourseExams(course.id).length} 套试卷
-                      </Badge>
-                    </div>
-                  </div>
-                  <CardHeader className="flex-grow">
-                    <CardTitle className="text-lg">{course.name}</CardTitle>
-                    <CardDescription className="line-clamp-2">
-                      {course.description}
-                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <FileText className="h-4 w-4 text-blue-600" />
-                        <span>{getCourseExams(course.id).length} 套试卷</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <span>{stats.completedExams} 已练习</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Target className="h-4 w-4 text-purple-600" />
-                        <span>练习模式</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Trophy className="h-4 w-4 text-yellow-600" />
-                        <span>{stats.completionRate}% 完成度</span>
-                      </div>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center text-muted-foreground">
+                            <Clock className="h-4 w-4 mr-1" />
+                            {exam.duration_minutes} 分钟
+                          </span>
+                          <span className="flex items-center text-muted-foreground">
+                            <BookOpen className="h-4 w-4 mr-1" />
+                            {exam.total_questions} 题
+                          </span>
                     </div>
 
-                    {stats.completedExams > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>练习进度</span><span className="text-blue-600">{stats.completedExams}/{stats.totalExams}</span>
+                        <div className="flex items-center justify-between text-sm">
+                          <span>总分: {exam.total_score}</span>
+                          <span>及格分: {exam.passing_score}</span>
                         </div>
-                        <Progress value={stats.completionRate} className="h-2" />
-                      </div>
-                    )}
 
-                    <Button className="w-full">
-                      <Play className="h-4 w-4 mr-2" />
-                      进入考试
-                    </Button>
+                        {exam.is_participated ? (
+                          <div className="space-y-2">
+                            <Button 
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => handleViewExam(exam.exam_id)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              查看详情
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Button 
+                              className="w-full"
+                              onClick={() => handleStartExam(exam.exam_id)}
+                            >
+                              <AlertTriangle className="h-4 w-4 mr-2" />
+                              开始考试
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => handleViewExam(exam.exam_id)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              查看详情
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
+                ))}
         </div>
 
-        {enrolledCourses.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <BookOpen className="h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg text-gray-600 mb-2">还没有报名课程</h3>
-              <p className="text-gray-500 text-center mb-4">
-                请联系课程顾问报名您感兴趣的职业培训课程
-              </p>
-              <Button onClick={() => window.open('tel:400-123-4567')}>
-                联系课程顾问
+              {/* 分页 */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    共 {total} 个考试，第 {currentPage} / {totalPages} 页
+                  </p>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage <= 1}
+                      onClick={() => handlePageChange(currentPage - 1)}
+                    >
+                      上一页
               </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    );
-  }
-
-  // 考试列表界面
-  if (examState === 'examList' && selectedCourse) {
-    const courseExams = getCourseExams(selectedCourse);
-    const selectedCourseInfo = availableCourses.find(c => c.id === selectedCourse);
-
-    return (
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <Button onClick={handleBackToCourseList} variant="ghost">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              返回课程列表
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => handlePageChange(currentPage + 1)}
+                    >
+                      下一页
             </Button>
-            <h1 className="text-3xl mt-2">{selectedCourseInfo?.name} - 模拟考试</h1>
-            <p className="text-gray-600 mt-1">选择考试进行模拟测试，检验学习成果</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courseExams.map(exam => {
-            const attempts = getMockExamAttempts(exam.id);
-            const progress = getMockExamProgress(exam.id);
-            const hasProgress = progress && !progress.isCompleted;
-            
-            return (
-              <Card key={exam.id} className="hover:shadow-lg transition-shadow flex flex-col">
-                <div className="relative">
-                  <div className="h-32 bg-gradient-to-br from-orange-500 via-red-500 to-pink-500 rounded-t-lg flex items-center justify-center">
-                    <div className="text-center text-white">
-                      <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-2 mx-auto">
-                        <FileText className="h-6 w-6" />
-                      </div>
-                      <div className="text-sm opacity-90">{exam.courseName}</div>
-                    </div>
-                  </div>
-                  <div className="absolute top-4 right-4">
-                    <Badge variant="secondary">
-                      {hasProgress ? '进行中' : '练习考试'}
-                    </Badge>
                   </div>
                 </div>
-                
-                <CardHeader className="flex-grow">
-                  <CardTitle className="text-lg">{exam.title}</CardTitle>
-                  <CardDescription className="line-clamp-2">
-                    {exam.description}
+              )}
+            </>
+          )}
+        </TabsContent>
+
+        {/* 我的记录 */}
+        <TabsContent value="attempts" className="space-y-6">
+          {myAttempts.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <BarChart3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">暂无考试记录</h3>
+                <p className="text-muted-foreground">您还没有参加任何考试，快去挑战一下吧！</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {myAttempts.map((attempt) => (
+                <Card key={attempt.attempt_id} className="hover:shadow-md transition-shadow">
+                  <CardHeader>
+                    <CardTitle className="text-lg line-clamp-2">{attempt.exam.title}</CardTitle>
+                    <CardDescription className="flex items-center gap-2">
+                      <span>{attempt.exam.course.title}</span>
+                      {getExamLevel(attempt.exam.course.level)}
                   </CardDescription>
                 </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <Clock className="h-4 w-4 text-blue-600" />
-                      <span>{exam.timeLimit} 分钟</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Target className="h-4 w-4 text-green-600" />
-                      <span>{exam.totalQuestions} 道题</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Award className="h-4 w-4 text-yellow-600" />
-                      <span>及格: {exam.passingScore}%</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <History className="h-4 w-4 text-purple-600" />
-                      <span>{attempts.length} 次尝试</span>
-                    </div>
-                  </div>
-
-                  {/* 进行中的考试进度 */}
-                  {hasProgress && progress && (
-                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                      <div className="flex justify-between text-sm text-orange-800 mb-2">
-                        <span>考试进度</span>
-                        <span>{progress.currentQuestionIndex + 1}/{progress.totalQuestions}</span>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">状态</span>
+                        <Badge variant={
+                          attempt.status === 'graded' ? 'default' :
+                          attempt.status === 'submitted' ? 'secondary' : 'outline'
+                        }>
+                          {attempt.status === 'graded' ? '已评分' :
+                           attempt.status === 'submitted' ? '已提交' : '进行中'}
+                        </Badge>
                       </div>
-                      <Progress 
-                        value={safePercentage(progress.currentQuestionIndex + 1, progress.totalQuestions)} 
-                        className="h-2 mb-2" 
-                      />
-                      <div className="text-xs text-orange-600">
-                        剩余时间: {formatTime(progress.timeLeft)}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 最佳成绩显示 */}
-                  {attempts.length > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span>最佳成绩</span>
-                      <span className={`font-medium ${
-                        Math.max(...attempts.map(a => a.score)) >= exam.passingScore ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {Math.max(...attempts.map(a => a.score))}% {Math.max(...attempts.map(a => a.score)) >= exam.passingScore ? '(通过)' : '(未通过)'}
-                      </span>
-                    </div>
-                  )}
-                  
-                  <div className="flex space-x-2">
-                    <Button className="flex-1" onClick={() => handleStartExam(exam)}>
-                      {hasProgress ? (
+                      
+                      {attempt.score !== null && attempt.score !== undefined && (
                         <>
-                          <Play className="h-4 w-4 mr-2" />
-                          继续考试
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">得分</span>
+                            <span className={`font-medium ${getScoreColor(attempt.score, attempt.exam.passing_score)}`}>
+                              {attempt.score} / {attempt.exam.total_score}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">结果</span>
+                            {getPassStatus(attempt.score, attempt.exam.passing_score)}
+                          </div>
                         </>
-                      ) : (
-                        <>开始考试</>
                       )}
-                    </Button>
-                    {attempts.length > 0 && !hasProgress && (
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // 考试进行中界面
-  if (examState === 'taking' && selectedExam) {
-    const currentQuestion = selectedExam.questions[currentQuestionIndex];
-    const answeredCount = answers.filter(a => a !== undefined && a !== null).length;
-
-    return (
-      <div className="p-6 max-w-4xl mx-auto">
-        {/* 顶部导航和信息 */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <Button onClick={handlePauseExam} variant="outline">
-              <Pause className="h-4 w-4 mr-2" />
-              暂停
-            </Button>
-            <div className="text-sm text-gray-600">
-              题目 {currentQuestionIndex + 1} / {selectedExam.totalQuestions}
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className={`flex items-center space-x-2 ${timeLeft <= 300 ? 'text-red-600' : 'text-gray-600'}`}>
-              <Clock className="h-4 w-4" />
-              <span className="font-mono">{formatTime(timeLeft)}</span>
-            </div>
-            <Button onClick={() => setShowSubmitDialog(true)} variant="outline">
-              提交考试
-            </Button>
-          </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">开始时间</span>
+                        <span className="text-sm">{formatDate(attempt.start_time)}</span>
         </div>
 
-        {/* 进度条 */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-2xl">{selectedExam.title}</h1>
-            <span className="text-sm text-gray-600">已答: {answeredCount}/{selectedExam.totalQuestions}</span>
-          </div>
-          <Progress value={(currentQuestionIndex + 1) / selectedExam.totalQuestions * 100} className="h-2" />
-        </div>
-
-        {/* 题目 */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-xl">{currentQuestion.question}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentQuestion.type === "single-choice" ? (
-              <RadioGroup
-                value={currentAnswer?.toString() || ""}
-                onValueChange={(value) => handleAnswerSelect(parseInt(value))}
-              >
-                {currentQuestion.options.map((option, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <RadioGroupItem value={index.toString()} id={`option-${index}`} />
-                    <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
-                      {option}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            ) : (
-              <div className="space-y-2">
-                {currentQuestion.options.map((option, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`option-${index}`}
-                      checked={Array.isArray(currentAnswer) && currentAnswer.includes(index)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          const newAnswer = Array.isArray(currentAnswer) ? [...currentAnswer, index] : [index];
-                          handleAnswerSelect(newAnswer);
-                        } else {
-                          const newAnswer = Array.isArray(currentAnswer) ? currentAnswer.filter(a => a !== index) : [];
-                          handleAnswerSelect(newAnswer.length > 0 ? newAnswer : null);
-                        }
-                      }}
-                    />
-                    <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
-                      {option}
-                    </Label>
-                  </div>
-                ))}
+                      {attempt.submit_time && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">提交时间</span>
+                          <span className="text-sm">{formatDate(attempt.submit_time)}</span>
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* 导航按钮 */}
-        <div className="flex justify-between">
-          <Button
-            onClick={handlePreviousQuestion}
-            disabled={currentQuestionIndex === 0}
-            variant="outline"
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            上一题
-          </Button>
 
           <Button
-            onClick={handleNextQuestion}
-            disabled={currentQuestionIndex === selectedExam.totalQuestions - 1}
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => toast.info("详情查看功能开发中")}
           >
-            下一题
-            <ChevronRight className="h-4 w-4 ml-2" />
+                        查看详情
           </Button>
         </div>
-
-        {/* 暂停对话框 */}
-        <Dialog open={showPauseDialog} onOpenChange={setShowPauseDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>考试已暂停</DialogTitle>
-              <DialogDescription>
-                您可以继续考试或退出。退出后您的答案将被保存，可以稍后继续。
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-end space-x-2">
-              <Button onClick={() => {
-                setExamState('courseList');
-                setShowPauseDialog(false);
-              }} variant="outline">
-                退出考试
-              </Button>
-              <Button onClick={handleResumeExam}>
-                继续考试
-              </Button>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* 提交确认对话框 */}
-        <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>确认提交考试</DialogTitle>
-              <DialogDescription>
-                您确定要提交考试吗？提交后将无法修改答案。
-                <br />
-                已答题目：{answeredCount}/{selectedExam.totalQuestions}
-                <br />
-                剩余时间：{formatTime(timeLeft)}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-end space-x-2">
-              <Button onClick={() => setShowSubmitDialog(false)} variant="outline">
-                取消
-              </Button>
-              <Button onClick={handleSubmitExam}>
-                确认提交
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* 时间警告对话框 */}
-        <Dialog open={showTimeWarning} onOpenChange={setShowTimeWarning}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center text-orange-600">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                时间提醒
-              </DialogTitle>
-              <DialogDescription>
-                考试时间还剩5分钟，请抓紧时间完成剩余题目。
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-end">
-              <Button onClick={() => setShowTimeWarning(false)}>
-                知道了
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    );
-  }
-
-  // 考试完成界面
-  if (examState === 'completed' && currentAttempt) {
-    return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <div className={`w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center ${
-            currentAttempt.passed ? 'bg-green-100' : 'bg-red-100'
-          }`}>
-            {currentAttempt.passed ? (
-              <CheckCircle2 className="h-12 w-12 text-green-600" />
-            ) : (
-              <XCircle className="h-12 w-12 text-red-600" />
-            )}
-          </div>
-          <h1 className="text-3xl mb-2">考试完成！</h1>
-          <p className="text-gray-600">
-            {currentAttempt.passed ? '恭喜您通过了考试！' : '很遗憾，您未能通过考试，请继续努力！'}
-          </p>
-        </div>
-
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>考试成绩</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-              <div>
-                <div className={`text-4xl font-bold ${currentAttempt.passed ? 'text-green-600' : 'text-red-600'}`}>
-                  {currentAttempt.score}%
-                </div>
-                <div className="text-sm text-gray-600">总得分</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-blue-600">{currentAttempt.correctAnswers}</div>
-                <div className="text-sm text-gray-600">正确题数</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-purple-600">{currentAttempt.totalQuestions}</div>
-                <div className="text-sm text-gray-600">总题数</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-orange-600">{Math.floor(currentAttempt.timeSpent / 60)}</div>
-                <div className="text-sm text-gray-600">用时(分钟)</div>
-              </div>
-            </div>
-
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span>及格线</span>
-                <span className="font-medium">{currentAttempt.passingScore}%</span>
-              </div>
-              <Progress 
-                value={currentAttempt.score} 
-                className="h-3 mt-2"
-              />
-              <div className="flex justify-between text-sm text-gray-600 mt-1">
-                <span>0%</span>
-                <span className="text-red-600">{currentAttempt.passingScore}%</span>
-                <span>100%</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-center space-x-4">
-          <Button onClick={() => setExamState('courseList')} variant="outline">
-            返回考试列表
-          </Button>
-          <Button onClick={() => {
-            if (selectedExam) handleStartExam(selectedExam);
-          }}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            重新考试
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // 默认加载状态
-  return (
-    <div className="p-6 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">正在加载...</p>
-      </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
