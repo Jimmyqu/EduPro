@@ -38,6 +38,23 @@ export interface Course {
   category?: string;
   level: string;
   status: string;
+  
+  // 移除所有时间和人数限制相关字段
+  // enrollment_start_date?: string;
+  // enrollment_end_date?: string;
+  // course_start_date?: string;
+  // course_end_date?: string;
+  // max_students?: number;
+  
+  // 新增：学习天数
+  learning_days: number;
+  requires_approval: boolean;
+  current_student_count: number;
+  // 移除报名时间和课程时间检查
+  // is_enrollment_open: boolean;
+  // is_course_active: boolean;
+  can_enroll: boolean;
+  
   created_at: string;
   updated_at: string;
 }
@@ -71,11 +88,7 @@ export interface CoursewareListResponse {
   total_pages: number;
 }
 
-// 课程详情响应
-export interface CourseDetail extends Course {
-  coursewares: Courseware[];
-  is_enrolled: boolean;
-}
+
 
 // 选课记录
 // 课程统计信息
@@ -93,6 +106,19 @@ export interface Enrollment {
   course: Course;
   enrolled_at: string;
   status: string;
+  
+  // 审核相关字段
+  approval_status: string;
+  approved_by?: User;
+  approved_at?: string;
+  rejection_reason?: string;
+  valid_until?: string;
+  is_valid: boolean;
+  days_until_expiry?: number;
+  
+  // 新增：剩余学习天数
+  remaining_days: number;
+  
   stats: CourseStats;
 }
 
@@ -133,6 +159,63 @@ export interface ChangePasswordRequest {
 export interface OSSSignedUrlResponse {
   url: string;
   expires_in: number;
+}
+
+// 课程报名申请相关类型
+export interface CourseEnrollmentApplication {
+  application_id: number;
+  student: User;
+  course: Course;
+  application_reason?: string;
+  status: string;
+  reviewer?: User;
+  review_comment?: string;
+  reviewed_at?: string;
+  applied_at: string;
+  updated_at: string;
+}
+
+export interface ApplicationListResponse {
+  applications: CourseEnrollmentApplication[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+export interface CourseApplicationRequest {
+  course_id: number;
+  application_reason?: string;
+}
+
+export interface ApplicationReviewRequest {
+  action: 'approve' | 'reject';
+  review_comment?: string;
+  valid_until?: string;
+}
+
+export interface ApplicationStatusResponse {
+  has_enrolled: boolean;
+  has_applied?: boolean;
+  enrollment_status?: string;
+  application_status?: string;
+  enrollment?: {
+    enrollment_id: number;
+    approval_status: string;
+    approved_at?: string;
+    rejection_reason?: string;
+    valid_until?: string;
+    is_valid: boolean;
+    days_until_expiry?: number;
+  };
+  application?: {
+    application_id: number;
+    status: string;
+    application_reason?: string;
+    review_comment?: string;
+    applied_at: string;
+    reviewed_at?: string;
+  };
 }
 
 // ==================== 练习和考试相关类型 ====================
@@ -424,10 +507,7 @@ export const apiService = {
     return apiRequest(endpoint);
   },
 
-  // 获取课程详情
-  async getCourseDetail(courseId: number): Promise<ApiResponse<CourseDetail>> {
-    return apiRequest(`/courses/${courseId}`);
-  },
+
 
   // 选课
   async enrollCourse(courseId: number): Promise<ApiResponse> {
@@ -441,6 +521,40 @@ export const apiService = {
     return apiRequest(`/courses/${courseId}/unenroll`, {
       method: 'POST',
     });
+  },
+
+  // 申请报名课程
+  async applyCourse(courseId: number, applicationReason?: string): Promise<ApiResponse> {
+    return apiRequest(`/courses/${courseId}/apply`, {
+      method: 'POST',
+      body: JSON.stringify({
+        course_id: courseId,
+        application_reason: applicationReason
+      }),
+    });
+  },
+
+  // 获取课程申请状态
+  async getCourseApplicationStatus(courseId: number): Promise<ApiResponse<ApplicationStatusResponse>> {
+    return apiRequest(`/courses/${courseId}/application-status`);
+  },
+
+  // 获取我的申请记录
+  async getMyApplications(params?: {
+    page?: number;
+    per_page?: number;
+  }): Promise<ApiResponse<ApplicationListResponse>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params) {
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.per_page) queryParams.append('per_page', params.per_page.toString());
+    }
+    
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/my-applications?${queryString}` : '/my-applications';
+    
+    return apiRequest(endpoint);
   },
 
   // ==================== 课件相关 ====================
@@ -606,6 +720,8 @@ export const apiService = {
       body: JSON.stringify({ answers }),
     });
   },
+
+
 
   // ==================== 测试相关 ====================
   

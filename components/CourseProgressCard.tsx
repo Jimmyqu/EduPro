@@ -119,7 +119,7 @@ export function CourseProgressCard({ course, onNavigate }: CourseProgressCardPro
         <div className="flex items-center justify-between pt-2 border-t">
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <Clock className="h-4 w-4" />
-            <span>学习时长: {course.studyHours}小时</span>
+            <span>学习时长: {course.studyHours}小时 · 剩余: {course.remainingDays}天</span>
           </div>
           <div className="flex space-x-2">
             <Button 

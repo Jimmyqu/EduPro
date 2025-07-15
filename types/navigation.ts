@@ -1,7 +1,10 @@
-export type Section = 'dashboard' | 'pdfs' | 'videos' | 'exercises' | 'exams' | 'profile';
+export type Section = 'dashboard' | 'courses' | 'coursewares' | 'applications' | 'pdfs' | 'videos' | 'exercises' | 'exams' | 'profile';
 
 export const sectionRoutes: Record<Section, string> = {
   dashboard: '/dashboard',
+  courses: '/courses',
+  coursewares: '/coursewares',
+  applications: '/applications',
   pdfs: '/pdfs',
   videos: '/videos',
   exercises: '/exercises',
@@ -11,6 +14,9 @@ export const sectionRoutes: Record<Section, string> = {
 
 export const routeSections: Record<string, Section> = {
   '/dashboard': 'dashboard',
+  '/courses': 'courses',
+  '/coursewares': 'coursewares',
+  '/applications': 'applications',
   '/pdfs': 'pdfs',
   '/videos': 'videos',
   '/exercises': 'exercises',

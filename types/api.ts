@@ -43,10 +43,7 @@ export interface ApiCoursewareListResponse {
   total_pages: number;
 }
 
-export interface ApiCourseDetail extends ApiCourse {
-  coursewares: ApiCourseware[];
-  is_enrolled: boolean;
-}
+
 
 export interface ApiCourseStats {
   total_videos: number;
@@ -62,6 +59,14 @@ export interface ApiEnrollment {
   course: ApiCourse;
   enrolled_at: string;
   status: string;
+  approval_status: string;
+  approved_by?: ApiUser;
+  approved_at?: string;
+  rejection_reason?: string;
+  valid_until?: string;
+  is_valid: boolean;
+  days_until_expiry?: number;
+  remaining_days: number;
   stats: ApiCourseStats;
 }
 
@@ -120,13 +125,36 @@ export function convertApiCoursewareToLocal(apiCourseware: ApiCourseware) {
 }
 
 export function convertApiEnrollmentToLocal(apiEnrollment: ApiEnrollment) {
-  return {
+  console.log('convertApiEnrollmentToLocal 输入:', apiEnrollment);
+  
+  if (!apiEnrollment) {
+    console.error('convertApiEnrollmentToLocal: apiEnrollment is undefined');
+    return null;
+  }
+
+  if (!apiEnrollment.course) {
+    console.error('convertApiEnrollmentToLocal: course is undefined', apiEnrollment);
+    return null;
+  }
+
+  const result = {
     enrollment_id: apiEnrollment.enrollment_id,
     course: convertApiCourseToLocal(apiEnrollment.course),
     enrolled_at: apiEnrollment.enrolled_at,
     status: apiEnrollment.status,
+    approval_status: apiEnrollment.approval_status,
+    approved_by: apiEnrollment.approved_by ? convertApiUserToLocal(apiEnrollment.approved_by) : undefined,
+    approved_at: apiEnrollment.approved_at,
+    rejection_reason: apiEnrollment.rejection_reason,
+    valid_until: apiEnrollment.valid_until,
+    is_valid: apiEnrollment.is_valid,
+    days_until_expiry: apiEnrollment.days_until_expiry,
+    remaining_days: apiEnrollment.remaining_days,
     stats: apiEnrollment.stats
   };
+  
+  console.log('convertApiEnrollmentToLocal 输出:', result);
+  return result;
 }
 
 // 计算课程学习进度的辅助函数
@@ -166,7 +194,24 @@ export function convertApiProgressToLocal(
 
 // 从enrollment数据直接创建课程进度信息（使用新的stats字段）
 export function convertEnrollmentToProgress(enrollment: any) {
-  const { course, stats, enrolled_at } = enrollment;
+  // 添加安全检查
+  if (!enrollment) {
+    console.error('convertEnrollmentToProgress: enrollment is undefined');
+    return null;
+  }
+
+  const { course, stats, enrolled_at, remaining_days } = enrollment;
+  
+  // 检查必需字段
+  if (!course || !course.course_id) {
+    console.error('convertEnrollmentToProgress: course or course.course_id is undefined', enrollment);
+    return null;
+  }
+
+  if (!stats) {
+    console.error('convertEnrollmentToProgress: stats is undefined', enrollment);
+    return null;
+  }
   
   // 计算完成百分比
   const completionPercentage = stats.total_coursewares > 0 
@@ -174,18 +219,19 @@ export function convertEnrollmentToProgress(enrollment: any) {
     : 0;
 
   return {
-    courseId: course.id.toString(),
-    courseName: course.name,
+    courseId: course.course_id.toString(),
+    courseName: course.title || '未知课程',
     category: course.category || '未分类',
-    totalVideos: stats.total_videos,
-    watchedVideos: stats.viewed_videos,
+    totalVideos: stats.total_videos || 0,
+    watchedVideos: stats.viewed_videos || 0,
     totalExercises: 0, // 暂未提供练习统计
     completedExercises: 0,
-    totalPDFs: stats.total_documents,
-    readPDFs: stats.viewed_documents,
-    studyHours: Math.round((stats.completed_coursewares * 0.5)), // 估算学习时长：每个课件0.5小时
-    lastActivity: enrolled_at, // 使用选课时间作为最后活动时间
-    completionPercentage
+    totalPDFs: stats.total_documents || 0,
+    readPDFs: stats.viewed_documents || 0,
+    studyHours: Math.round(((stats.completed_coursewares || 0) * 0.5)), // 估算学习时长：每个课件0.5小时
+    lastActivity: enrolled_at || new Date().toISOString(), // 使用选课时间作为最后活动时间
+    completionPercentage,
+    remainingDays: remaining_days || 0 // 添加剩余学习天数
   };
 } 
 

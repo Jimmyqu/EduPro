@@ -15,6 +15,7 @@ export interface CourseProgress {
   studyHours: number;
   lastActivity: string;
   completionPercentage: number;
+  remainingDays?: number; // 剩余学习天数
 }
 
 export interface CourseEnrollment {

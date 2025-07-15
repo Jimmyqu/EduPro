@@ -5,7 +5,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
-import { Play, FileText, BookOpen, Settings, Trophy, TrendingUp, GraduationCap, ClipboardCheck, Lock, AlertCircle, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import { Play, FileText, BookOpen, Settings, Trophy, TrendingUp, GraduationCap, ClipboardCheck, Lock, AlertCircle, Loader2, Clock } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { CourseProgressCard } from "./CourseProgressCard";
 import { CourseStatsOverview } from "./CourseStatsOverview";
@@ -48,15 +51,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     isLoading: true
   });
 
-  // 确认对话框状态
+  // 申请报名对话框状态
   const [enrollDialog, setEnrollDialog] = useState<{
     isOpen: boolean;
-    courseId: string;
-    courseName: string;
+    course: any;
+    applicationReason: string;
+    isSubmitting: boolean;
   }>({
     isOpen: false,
-    courseId: '',
-    courseName: ''
+    course: null,
+    applicationReason: '',
+    isSubmitting: false
   });
 
   // 获取仪表板数据
@@ -93,13 +98,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const userData = convertApiUserToLocal(profileResponse.data);
 
       // 转换我的课程数据
-      const myCoursesData = myCoursesResponse.data.map(convertApiEnrollmentToLocal);
+      console.log('原始我的课程数据:', myCoursesResponse.data);
+      const myCoursesData = myCoursesResponse.data
+        .map(convertApiEnrollmentToLocal)
+        .filter(enrollment => enrollment !== null); // 过滤掉转换失败的数据
+      console.log('转换后的我的课程数据:', myCoursesData);
 
-      // 转换所有课程数据
-      const allCoursesData = allCoursesResponse.data.courses.map(convertApiCourseToLocal);
+      // 直接使用新的课程数据（包含报名状态等信息）
+      const allCoursesData = allCoursesResponse.data.courses;
 
       // 直接从enrollment数据创建课程进度信息（使用新的stats字段）
-      const courseProgress = myCoursesData.map(convertEnrollmentToProgress);
+      const courseProgress = myCoursesData
+        .map(convertEnrollmentToProgress)
+        .filter(progress => progress !== null); // 过滤掉转换失败的数据
 
       // 计算学习统计（使用新的stats数据）
       const studyStats = {
@@ -156,42 +167,66 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     });
   };
 
-  // 显示选课确认对话框
-  const showEnrollDialog = (courseId: string, courseName: string) => {
+  // 显示申请报名对话框
+  const showEnrollDialog = (course: any) => {
     setEnrollDialog({
       isOpen: true,
-      courseId,
-      courseName
+      course,
+      applicationReason: '',
+      isSubmitting: false
     });
   };
 
-  // 确认选课处理
+  // 确认申请报名处理
   const confirmEnrollCourse = async () => {
-    const { courseId, courseName } = enrollDialog;
+    const { course, applicationReason } = enrollDialog;
+    
+    if (!course) return;
     
     try {
-      setEnrollDialog(prev => ({ ...prev, isOpen: false }));
+      setEnrollDialog(prev => ({ ...prev, isSubmitting: true }));
       
-      const response = await apiService.enrollCourse(parseInt(courseId));
+      let response;
+      if (course.requires_approval) {
+        // 需要审核的课程，调用申请接口
+        response = await apiService.applyCourse(course.course_id, applicationReason);
+      } else {
+        // 不需要审核的课程，直接选课
+        response = await apiService.enrollCourse(course.course_id);
+      }
+      
       if (isApiSuccess(response)) {
-        toast.success(`成功选择《${courseName}》课程！`);
+        toast.success(
+          course.requires_approval 
+            ? `成功提交《${course.title}》课程申请，请等待审核！`
+            : `成功选择《${course.title}》课程！`
+        );
+        setEnrollDialog({
+          isOpen: false,
+          course: null,
+          applicationReason: '',
+          isSubmitting: false
+        });
         // 重新获取数据
         fetchDashboardData();
       } else {
-        toast.error("选课失败", { description: response.message });
+        toast.error("申请失败", { description: response.message });
+        setEnrollDialog(prev => ({ ...prev, isSubmitting: false }));
       }
     } catch (error) {
-      console.error("选课失败:", error);
-      toast.error("选课失败", { description: "请稍后重试" });
+      console.error("申请失败:", error);
+      toast.error("申请失败", { description: "请稍后重试" });
+      setEnrollDialog(prev => ({ ...prev, isSubmitting: false }));
     }
   };
 
-  // 取消选课
+  // 取消申请
   const cancelEnrollCourse = () => {
     setEnrollDialog({
       isOpen: false,
-      courseId: '',
-      courseName: ''
+      course: null,
+      applicationReason: '',
+      isSubmitting: false
     });
   };
 
@@ -278,8 +313,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   // 按权限状态排序课程：已选课程在前，未选课程在后
   const sortedCourses = [...allCourses].sort((a, b) => {
-    const aHasAccess = hasAccess(a.id);
-    const bHasAccess = hasAccess(b.id);
+    const aHasAccess = hasAccess(a.course_id.toString());
+    const bHasAccess = hasAccess(b.course_id.toString());
     
     if (aHasAccess && !bHasAccess) return -1;
     if (!aHasAccess && bHasAccess) return 1;
@@ -428,50 +463,102 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {sortedCourses.map(course => {
-                  const hasUserAccess = hasAccess(course.id);
-                  const userProgress = courseProgress.find(p => p.courseId === course.id);
+                  const hasUserAccess = hasAccess(course.course_id.toString());
+                  const userProgress = courseProgress.find(p => p.courseId === course.course_id.toString());
+                  const userEnrollment = myCourses.find(e => e.course.course_id === course.course_id);
                   
-                  return (
-                    <div 
-                      key={course.id} 
-                      className={`p-4 border rounded-lg transition-all hover:shadow-md flex flex-col ${
-                        hasUserAccess ? 'border-gray-200 hover:border-blue-300' : 'border-gray-100 bg-gray-50'
+                  // 获取课程状态信息
+                  const getEnrollmentStatusBadge = () => {
+                    if (hasUserAccess) {
+                      return <Badge variant="default" className="bg-green-100 text-green-800 text-xs">已选课</Badge>;
+                    }
+                    // 移除报名时间检查，课程随时可报名
+                    // if (!course.is_enrollment_open) {
+                    //   return <Badge variant="outline" className="text-xs">报名已结束</Badge>;
+                    // }
+                    if (course.requires_approval) {
+                      return <Badge variant="secondary" className="text-xs">需要审核</Badge>;
+                    }
+                    return <Badge variant="default" className="text-xs">可直接报名</Badge>;
+                  };
+
+                  const getLevelBadge = (level: string) => {
+                    const levelMap = {
+                      'beginner': { label: '初级', variant: 'secondary' as const },
+                      'intermediate': { label: '中级', variant: 'default' as const },
+                      'advanced': { label: '高级', variant: 'destructive' as const }
+                    };
+                    const levelInfo = levelMap[level as keyof typeof levelMap];
+                    return levelInfo ? (
+                      <Badge variant={levelInfo.variant} className="text-xs">{levelInfo.label}</Badge>
+                    ) : (
+                      <Badge className="text-xs">{level}</Badge>
+                    );
+                  };
+
+                  const formatDate = (dateString: string) => {
+                    return new Date(dateString).toLocaleDateString('zh-CN');
+                  };
+                  
+                                      return (
+                      <div 
+                        key={course.course_id} 
+                      className={`p-4 border rounded-lg transition-all hover:shadow-md flex flex-col cursor-pointer ${
+                        hasUserAccess ? 'border-green-200 bg-green-50/30' : 
+                        course.can_enroll ? 'border-gray-200 hover:border-blue-300' : 'border-gray-100 bg-gray-50'
                       }`}
+                      onClick={() => {
+                        if (hasUserAccess) {
+                          // 已选课程，显示课程信息
+                          console.log('已选课程:', course);
+                        } else if (course.can_enroll) {
+                          // 未选课程，直接显示报名确认弹窗
+                          showEnrollDialog(course);
+                        } else {
+                          // 不可报名，显示提示
+                          toast.error('该课程暂不可报名');
+                        }
+                      }}
                     >
                       <div className="flex items-start justify-between mb-2">
-                        <h4 className={`font-medium ${hasUserAccess ? 'text-gray-900' : 'text-gray-600'}`}>
-                          {course.name}
+                        <h4 className={`font-medium ${hasUserAccess ? 'text-gray-900' : 'text-gray-700'}`}>
+                          {course.title}
                         </h4>
-                        <div className="flex items-center space-x-1">
-                          {hasUserAccess ? (
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                              已报名
-                            </Badge>
-                          ) : (
-                            <div className="flex items-center space-x-1">
-                              <Lock className="h-3 w-3 text-gray-400" />
-                              <Badge variant="outline" className="text-xs text-gray-500 border-gray-300">
-                                未报名
-                              </Badge>
-                            </div>
-                          )}
+                        <div className="flex items-center space-x-1 flex-wrap gap-1">
+                          {getLevelBadge(course.level)}
+                          {getEnrollmentStatusBadge()}
                         </div>
                       </div>
                       
-                      <Badge variant="secondary" className="mb-2 text-xs w-fit">
-                        {course.category}
-                      </Badge>
+                      {course.category && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <BookOpen className="h-3 w-3 text-gray-500" />
+                          <span className="text-xs text-gray-600">{course.category}</span>
+                        </div>
+                      )}
                       
-                      <p className={`text-sm mb-3 flex-grow ${hasUserAccess ? 'text-gray-600' : 'text-gray-500'}`}>
-                        {course.description}
+                      <p className={`text-sm mb-3 flex-grow ${hasUserAccess ? 'text-gray-600' : 'text-gray-500'} line-clamp-2`}>
+                        {course.description || '暂无课程描述'}
                       </p>
                       
+                      {/* 简化的课程信息 */}
                       <div className="text-xs text-gray-500 space-y-1 mb-3">
-                        <div>课程级别：{course.level}</div>
-                        <div>创建时间：{new Date(course.created_at).toLocaleDateString()}</div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3 w-3" />
+                          <span>学习期限: {course.learning_days} 天</span>
+                        </div>
+                        
+                        {hasUserAccess && userEnrollment && (
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-3 w-3" />
+                            <span className="text-orange-600">
+                              剩余学习天数: {userEnrollment.remaining_days !== undefined ? `${userEnrollment.remaining_days} 天` : '计算中...'}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
-                      {/* 已报名课程显示学习进度 */}
+                      {/* 已选课显示学习进度 */}
                       {hasUserAccess && userProgress && (
                         <div className="mb-3">
                           <div className="flex justify-between text-xs text-gray-600 mb-1">
@@ -480,19 +567,34 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                              className="bg-green-600 h-2 rounded-full transition-all duration-300" 
                               style={{ width: `${userProgress.completionPercentage}%` }}
                             ></div>
                           </div>
                         </div>
                       )}
 
-                      {/* 未报名课程显示选课按钮 */}
+                      {/* 课程状态提示 */}
                       {!hasUserAccess && (
-                        <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                        <div className={`mb-3 p-2 rounded border ${
+                          course.can_enroll ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
+                        }`}>
                           <div className="flex items-center space-x-2">
-                            <AlertCircle className="h-4 w-4 text-blue-600" />
-                            <span className="text-xs text-blue-700">点击下方按钮选择此课程</span>
+                            {course.can_enroll ? (
+                              <>
+                                <AlertCircle className="h-4 w-4 text-blue-600" />
+                                <span className="text-xs text-blue-700">
+                                  {course.requires_approval ? '点击申请报名（需要审核）' : '点击直接报名'}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <Lock className="h-4 w-4 text-gray-500" />
+                                <span className="text-xs text-gray-600">
+                                  {!course.is_enrollment_open ? '报名时间已过' : '暂不可报名'}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       )}
@@ -502,7 +604,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                           <Button 
                             size="sm" 
                             className="flex-1"
-                            onClick={() => onNavigate('videos')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onNavigate('videos');
+                            }}
                           >
                             开始学习
                           </Button>
@@ -510,9 +615,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                           <Button 
                             size="sm" 
                             className="flex-1"
-                            onClick={() => showEnrollDialog(course.id, course.name)}
+                            disabled={!course.can_enroll}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (course.can_enroll) {
+                                // 直接显示报名确认弹窗
+                                showEnrollDialog(course);
+                              }
+                            }}
                           >
-                            选择课程
+                            {course.can_enroll ? (course.requires_approval ? '申请报名' : '立即报名') : '暂不可报名'}
                           </Button>
                         )}
                       </div>
@@ -525,12 +637,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </TabsContent>
 
         <TabsContent value="courses" className="space-y-6">
-          {courseProgress.length > 0 ? (
+          {myCourses.filter(course => course.approval_status === 'approved').length > 0 ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl">我的课程进度</h3>
-                  <p className="text-gray-600">查看所有已报名课程的详细学习进度</p>
+                  <h3 className="text-xl">我的课程</h3>
+                  <p className="text-gray-600">查看所有已审核通过的课程和学习进度</p>
                 </div>
                 <Button onClick={fetchDashboardData} variant="outline">
                   刷新数据
@@ -538,15 +650,143 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {courseProgress
-                  .sort((a, b) => b.completionPercentage - a.completionPercentage)
-                  .map(course => (
-                    <CourseProgressCard
-                      key={course.courseId}
-                      course={course}
-                      onNavigate={onNavigate}
-                    />
-                  ))}
+                {myCourses
+                  .filter(enrollment => enrollment.approval_status === 'approved')
+                  .sort((a, b) => {
+                    // 按选课时间排序（最新的在前）
+                    return new Date(b.enrolled_at).getTime() - new Date(a.enrolled_at).getTime();
+                  })
+                  .map(enrollment => {
+                    const progress = courseProgress.find(p => p.courseId === enrollment.course.course_id.toString());
+                    
+                    // 计算到期时间
+                    const getExpiryDate = () => {
+                      if (enrollment.valid_until) {
+                        return new Date(enrollment.valid_until).toLocaleDateString('zh-CN');
+                      }
+                      return '计算中...';
+                    };
+                    
+                    // 判断是否即将到期（7天内）
+                    const isExpiringSoon = enrollment.remaining_days <= 7 && enrollment.remaining_days > 0;
+                    const isExpired = enrollment.remaining_days <= 0;
+                    
+                    return (
+                      <Card key={enrollment.enrollment_id} className="hover:shadow-lg transition-shadow border-green-200 bg-green-50/30">
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <CardTitle className="text-lg">{enrollment.course.title}</CardTitle>
+                            <div className="flex flex-col gap-1">
+                              <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+                                已通过
+                              </Badge>
+                              {enrollment.course.level && (
+                                <Badge variant="outline" className="text-xs">
+                                  {enrollment.course.level === 'beginner' ? '初级' :
+                                   enrollment.course.level === 'intermediate' ? '中级' : '高级'}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <CardDescription>
+                            {enrollment.course.description || '暂无课程描述'}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {/* 课程基本信息 */}
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-500">学习期限: </span>
+                                <span>{enrollment.course.learning_days} 天</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">选课时间: </span>
+                                <span>{new Date(enrollment.enrolled_at).toLocaleDateString('zh-CN')}</span>
+                              </div>
+                            </div>
+                            
+                            {/* 审核通过时间 */}
+                            {enrollment.approved_at && (
+                              <div className="text-sm">
+                                <span className="text-gray-500">审核通过时间: </span>
+                                <span>{new Date(enrollment.approved_at).toLocaleDateString('zh-CN')}</span>
+                              </div>
+                            )}
+                            
+                            {/* 学习期限信息 */}
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-500">到期时间: </span>
+                                <span className={isExpired ? 'text-red-600 font-medium' : isExpiringSoon ? 'text-orange-600 font-medium' : ''}>
+                                  {getExpiryDate()}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">剩余天数: </span>
+                                <span className={
+                                  isExpired ? 'text-red-600 font-medium' :
+                                  isExpiringSoon ? 'text-orange-600 font-medium' : 'text-green-600'
+                                }>
+                                  {isExpired ? '已过期' : `${enrollment.remaining_days} 天`}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* 过期警告 */}
+                            {isExpiringSoon && !isExpired && (
+                              <div className="bg-orange-100 border border-orange-200 rounded p-3 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <AlertCircle className="h-4 w-4 text-orange-600" />
+                                  <span className="text-orange-800">
+                                    课程即将到期，请抓紧时间学习！
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {isExpired && (
+                              <div className="bg-red-100 border border-red-200 rounded p-3 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <AlertCircle className="h-4 w-4 text-red-600" />
+                                  <span className="text-red-800">
+                                    课程学习期限已过期，无法继续学习
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* 学习进度 */}
+                            {progress && (
+                              <div>
+                                <div className="flex justify-between text-sm text-gray-600 mb-1">
+                                  <span>学习进度</span>
+                                  <span>{progress.completionPercentage}%</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                                    style={{ width: `${progress.completionPercentage}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* 操作按钮 */}
+                            <div className="flex gap-2 pt-2">
+                              <Button 
+                                onClick={() => onNavigate('videos')} 
+                                className="flex-1"
+                                disabled={isExpired}
+                              >
+                                {isExpired ? '课程已过期' : '开始学习'}
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
               </div>
             </div>
           ) : (
@@ -574,27 +814,75 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </TabsContent>
       </Tabs>
 
-      {/* 选课确认对话框 */}
-      <AlertDialog open={enrollDialog.isOpen} onOpenChange={(open) => !open && cancelEnrollCourse()}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认选择课程</AlertDialogTitle>
-            <AlertDialogDescription>
-              您确定要选择《{enrollDialog.courseName}》课程吗？
-              <br />
-              选择后您将可以访问该课程的所有学习资料和练习内容。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelEnrollCourse}>
+      {/* 申请报名对话框 */}
+      <Dialog open={enrollDialog.isOpen} onOpenChange={(open) => !open && cancelEnrollCourse()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {enrollDialog.course?.requires_approval ? '申请报名课程' : '确认选择课程'}
+            </DialogTitle>
+            <DialogDescription>
+              {enrollDialog.course && (
+                <div className="space-y-2">
+                  <div>课程名称：《{enrollDialog.course.title}》</div>
+                  <div>学习期限：{enrollDialog.course.learning_days} 天</div>
+                  <div>难度等级：{
+                    enrollDialog.course.level === 'beginner' ? '初级' :
+                    enrollDialog.course.level === 'intermediate' ? '中级' : '高级'
+                  }</div>
+                  {enrollDialog.course.requires_approval && (
+                    <div className="text-orange-600">
+                      ⚠️ 该课程需要管理员审核，请填写申请理由
+                    </div>
+                  )}
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {enrollDialog.course?.requires_approval && (
+            <div className="space-y-2">
+              <Label htmlFor="applicationReason">申请理由 *</Label>
+              <Textarea
+                id="applicationReason"
+                placeholder="请简要说明您的学习目标和申请理由..."
+                value={enrollDialog.applicationReason}
+                onChange={(e) => setEnrollDialog(prev => ({ 
+                  ...prev, 
+                  applicationReason: e.target.value 
+                }))}
+                className="min-h-[80px]"
+              />
+            </div>
+          )}
+          
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={cancelEnrollCourse}
+              disabled={enrollDialog.isSubmitting}
+            >
               取消
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={confirmEnrollCourse}>
-              确认选择
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+            <Button 
+              onClick={confirmEnrollCourse}
+              disabled={
+                enrollDialog.isSubmitting || 
+                (enrollDialog.course?.requires_approval && !enrollDialog.applicationReason.trim())
+              }
+            >
+              {enrollDialog.isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {enrollDialog.course?.requires_approval ? '提交申请中...' : '选课中...'}
+                </>
+              ) : (
+                enrollDialog.course?.requires_approval ? '提交申请' : '确认选择'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
