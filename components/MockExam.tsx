@@ -26,9 +26,10 @@ import { toast } from "sonner";
 
 interface MockExamProps {
   onBack: () => void;
+  courseId?: number;
 }
 
-export function MockExam({ onBack }: MockExamProps) {
+export function MockExam({ onBack, courseId }: MockExamProps) {
   const router = useRouter();
   const [exams, setExams] = useState<Exam[]>([]);
   const [myAttempts, setMyAttempts] = useState<ExamAttempt[]>([]);
@@ -118,12 +119,12 @@ export function MockExam({ onBack }: MockExamProps) {
     if (!initialFetchRef.current) {
       initialFetchRef.current = true;
       Promise.all([
-        fetchExams(),
+        fetchExams(1, "", courseId),
         fetchMyAttempts(),
         fetchStats()
       ]);
     }
-  }, []);
+  }, [courseId]);
 
   // 搜索处理
   const handleSearch = () => {

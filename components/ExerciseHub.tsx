@@ -26,9 +26,10 @@ import { toast } from "sonner";
 
 interface ExerciseHubProps {
   onBack: () => void;
+  courseId?: number;
 }
 
-export function ExerciseHub({ onBack }: ExerciseHubProps) {
+export function ExerciseHub({ onBack, courseId }: ExerciseHubProps) {
   const router = useRouter();
   const [exercises, setExercises] = useState<Exam[]>([]);
   const [myAttempts, setMyAttempts] = useState<ExamAttempt[]>([]);
@@ -118,12 +119,12 @@ export function ExerciseHub({ onBack }: ExerciseHubProps) {
     if (!initialFetchRef.current) {
       initialFetchRef.current = true;
       Promise.all([
-        fetchExercises(),
+        fetchExercises(1, "", courseId),
         fetchMyAttempts(),
         fetchStats()
       ]);
     }
-  }, []);
+  }, [courseId]);
 
   // 搜索处理
   const handleSearch = () => {

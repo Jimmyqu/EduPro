@@ -93,7 +93,25 @@ export interface CoursewareListResponse {
 // 选课记录
 // 课程统计信息
 export interface CourseStats {
+  // PDF课件统计
+  total_pdfs: number;
+  completed_pdfs: number;
+  
+  // 视频统计
   total_videos: number;
+  completed_videos: number;
+  
+  // 练习统计
+  total_exercises: number;
+  completed_exercises: number;
+  participated_exercises: number;
+  
+  // 考试统计
+  total_exams: number;
+  completed_exams: number;
+  participated_exams: number;
+  
+  // 总体统计（保持向后兼容）
   total_documents: number;
   viewed_videos: number;
   viewed_documents: number;

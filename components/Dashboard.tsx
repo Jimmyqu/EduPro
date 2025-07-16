@@ -261,41 +261,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const user = dashboardData.user;
   const { courseProgress, myCourses, allCourses } = dashboardData;
 
-  const features = [
-    {
-      title: "学习课件",
-      description: "下载课件材料和参考文档",
-      icon: FileText,
-      action: () => onNavigate('pdfs'),
-      buttonText: "查看课件",
-      subtitle: "教材和辅导资料"
-    },
-    {
-      title: "视频学习",
-      description: "观看专业培训视频课程",
-      icon: Play,
-      action: () => onNavigate('videos'),
-      buttonText: "开始学习",
-      subtitle: `${user.enrolledCourses?.length || 0} 门已报名课程`
-    },
-    {
-      title: "练习测试",
-      description: "通过测验检验学习成果",
-      icon: BookOpen,
-      action: () => onNavigate('exercises'),
-      buttonText: "开始练习",
-      subtitle: "巩固专业知识"
-    },
-    {
-      title: "模拟考试",
-      description: "正式考试模拟，全面评估能力",
-      icon: ClipboardCheck,
-      action: () => onNavigate('exams'),
-      buttonText: "参加考试",
-      subtitle: "检验学习成果"
-    }
-  ];
-
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
@@ -321,39 +286,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return 0;
   });
 
-  // 功能卡片组件
-  const FeaturesGrid = ({ className = "" }: { className?: string }) => (
-    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ${className}`}>
-      {features.map((feature, index) => {
-        const Icon = feature.icon;
-        return (
-          <Card key={index} className="hover:shadow-lg transition-shadow flex flex-col">
-            <CardHeader className="flex-grow">
-              <div className="flex items-center space-x-2">
-                <Icon className={`h-6 w-6 ${
-                  feature.title === '模拟考试' ? 'text-orange-600' : 'text-blue-600'
-                }`} />
-                <CardTitle>{feature.title}</CardTitle>
-              </div>
-              <CardDescription>{feature.description}</CardDescription>
-              <Badge variant="outline" className="w-fit">
-                {feature.subtitle}
-              </Badge>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                onClick={feature.action} 
-                className="w-full"
-                variant={feature.title === '模拟考试' ? 'default' : 'default'}
-              >
-                {feature.buttonText}
-              </Button>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
 
   return (
     <div className="p-6 space-y-6">
@@ -378,10 +310,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Features Grid - 移动端显示在"观看视频"统计之前 */}
-          <div className="md:hidden">
-            <FeaturesGrid />
-          </div>
 
           {/* Stats Overview - "观看视频"等统计信息 */}
           <CourseStatsOverview courseProgress={courseProgress} />
@@ -445,11 +373,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </CardContent>
             </Card>
           )}
-
-          {/* Features Grid - 桌面端显示在原位置 */}
-          <div className="hidden md:block">
-            <FeaturesGrid />
-          </div>
 
           {/* All Courses Overview - 显示所有课程，区分权限状态 */}
           <Card>

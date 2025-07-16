@@ -12,9 +12,10 @@ import { convertApiCoursewareToLocal } from "../types/api";
 
 interface VideoLibraryProps {
   onBack: () => void;
+  courseId?: number;
 }
 
-export function VideoLibrary({ onBack }: VideoLibraryProps) {
+export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
   const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
@@ -77,31 +78,57 @@ export function VideoLibrary({ onBack }: VideoLibraryProps) {
     try {
       setLoading(true);
       
-      // 并行获取视频和课程数据
-      const [coursewaresResponse, coursesResponse] = await Promise.all([
-        apiService.getCoursewares({ page: 1, per_page: 12 }),
-        apiService.getCourses({ per_page: 50 })
-      ]);
-      
-      if (isApiSuccess(coursewaresResponse)) {
-        // 只显示视频类型的课件
-        const allCoursewares = coursewaresResponse.data.coursewares.map(convertApiCoursewareToLocal);
-        const videoCoursewares = allCoursewares.filter(courseware => 
-          courseware.content_url?.includes('.mp4')
-        );
+      // 如果传入了courseId，直接获取该课程的视频
+      if (courseId) {
+        const params = {
+          page: 1,
+          per_page: 12,
+          course_id: courseId
+        };
         
-        setVideos(videoCoursewares);
-        setTotalPages(coursewaresResponse.data.total_pages);
-        setTotal(coursewaresResponse.data.total);
-        setCurrentPage(1);
+        const response = await apiService.getCoursewares(params);
+        
+        if (isApiSuccess(response)) {
+          // 只显示视频类型的课件
+          const allCoursewares = response.data.coursewares.map(convertApiCoursewareToLocal);
+          const videoCoursewares = allCoursewares.filter(courseware => 
+            courseware.content_url?.includes('.mp4')
+          );
+          
+          setVideos(videoCoursewares);
+          setTotalPages(response.data.total_pages);
+          setTotal(response.data.total);
+          setCurrentPage(1);
+        } else {
+          toast.error("获取视频列表失败", { description: response.message });
+        }
       } else {
-        toast.error("获取视频列表失败", { description: coursewaresResponse.message });
-      }
+        // 并行获取视频和课程数据
+        const [coursewaresResponse, coursesResponse] = await Promise.all([
+          apiService.getCoursewares({ page: 1, per_page: 12 }),
+          apiService.getCourses({ per_page: 50 })
+        ]);
+        
+        if (isApiSuccess(coursewaresResponse)) {
+          // 只显示视频类型的课件
+          const allCoursewares = coursewaresResponse.data.coursewares.map(convertApiCoursewareToLocal);
+          const videoCoursewares = allCoursewares.filter(courseware => 
+            courseware.content_url?.includes('.mp4')
+          );
+          
+          setVideos(videoCoursewares);
+          setTotalPages(coursewaresResponse.data.total_pages);
+          setTotal(coursewaresResponse.data.total);
+          setCurrentPage(1);
+        } else {
+          toast.error("获取视频列表失败", { description: coursewaresResponse.message });
+        }
 
-      // 处理课程列表响应
-      if (isApiSuccess(coursesResponse)) {
-        setCourses(coursesResponse.data.courses);
-        setDataLoaded(true);
+        // 处理课程列表响应
+        if (isApiSuccess(coursesResponse)) {
+          setCourses(coursesResponse.data.courses);
+          setDataLoaded(true);
+        }
       }
 
     } catch (error) {
@@ -236,33 +263,35 @@ export function VideoLibrary({ onBack }: VideoLibraryProps) {
             <Button onClick={handleSearch}>搜索</Button>
           </div>
 
-          {/* 课程筛选 */}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={selectedCourse === null ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleCourseSelect(null)}
-            >
-              全部课程
-            </Button>
-            {courses.map((course) => {
-              const stats = getCourseStats(course.course_id.toString());
-              return (
-                <Button
-                  key={course.course_id}
-                  variant={selectedCourse === course.course_id.toString() ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleCourseSelect(course.course_id.toString())}
-                  className="flex items-center space-x-2"
-                >
-                  <span>{course.title}</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {stats.enrolled}/{stats.total}
-                  </Badge>
-                </Button>
-              );
-            })}
-          </div>
+          {/* 课程筛选 - 只在没有传入courseId时显示 */}
+          {!courseId && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={selectedCourse === null ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleCourseSelect(null)}
+              >
+                全部课程
+              </Button>
+              {courses.map((course) => {
+                const stats = getCourseStats(course.course_id.toString());
+                return (
+                  <Button
+                    key={course.course_id}
+                    variant={selectedCourse === course.course_id.toString() ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleCourseSelect(course.course_id.toString())}
+                    className="flex items-center space-x-2"
+                  >
+                    <span>{course.title}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {stats.enrolled}/{stats.total}
+                    </Badge>
+                  </Button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* 加载状态 */}
