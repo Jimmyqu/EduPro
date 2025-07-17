@@ -164,7 +164,8 @@ export default function Layout({ children }: LayoutProps) {
                   <Button
                     onClick={() => {
                       logout();
-                      router.push('/');
+                      // Redirect to the root URL of the Django application
+                      window.location.href = '/';
                     }}
                     variant="ghost"
                     size="sm"

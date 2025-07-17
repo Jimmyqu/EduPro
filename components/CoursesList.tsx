@@ -121,11 +121,8 @@ export function CoursesList() {
   };
 
   const getEnrollmentStatusBadge = (course: Course) => {
-    if (!course.is_enrollment_open) {
+    if (!course.can_enroll) {
       return <Badge variant="outline">报名已结束</Badge>;
-    }
-    if (course.max_students && course.current_student_count >= course.max_students) {
-      return <Badge variant="destructive">人数已满</Badge>;
     }
     if (course.requires_approval) {
       return <Badge variant="secondary">需要审核</Badge>;
@@ -297,7 +294,6 @@ export function CoursesList() {
                     <Users className="h-4 w-4" />
                     <span>
                       {course.current_student_count} 人已选课
-                      {course.max_students && ` / ${course.max_students} 人上限`}
                     </span>
                   </div>
 
@@ -308,21 +304,14 @@ export function CoursesList() {
                     </div>
                   )}
 
-                  {course.enrollment_end_date && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      <span>报名截止: {formatDate(course.enrollment_end_date)}</span>
-                    </div>
-                  )}
+
                 </div>
 
                 {/* 课程状态指示 */}
                 <div className="pt-2 border-t">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {course.is_course_active ? '课程进行中' : 
-                       course.course_start_date ? `将于 ${formatDate(course.course_start_date)} 开始` : 
-                       '即将开始'}
+                      课程可学习 {course.learning_days} 天
                     </span>
                     
                     {course.requires_approval && (
