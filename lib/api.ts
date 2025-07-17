@@ -1,5 +1,5 @@
 // API 配置
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // 统一响应结构（对应后端ApiResponse）
 export interface ApiResponse<T = any> {
