@@ -415,7 +415,7 @@ export function UserProfile({ onBack }: UserProfileProps) {
                                 )}
                                 
                                 {/* 操作按钮 */}
-                                {!isExpired && (
+                                {/* {!isExpired && (
                                   <div className="mt-4">
                                     <Button 
                                       onClick={() => console.log('选课信息:', enrollment)}
@@ -424,7 +424,7 @@ export function UserProfile({ onBack }: UserProfileProps) {
                                       查看课程
                                     </Button>
                                   </div>
-                                )}
+                                )} */}
                               </div>
                             </div>
                           </CardContent>
