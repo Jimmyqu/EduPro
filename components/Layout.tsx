@@ -162,9 +162,10 @@ export default function Layout({ children }: LayoutProps) {
                   </Button>
                   
                   <Button
-                    onClick={() => {
-                      logout();
-                      // Redirect to the root URL of the Django application
+                    onClick={async () => {
+                      // 等待logout完成，确保清除所有本地token信息
+                      await logout();
+                      // 跳转到根路径
                       window.location.href = '/';
                     }}
                     variant="ghost"
