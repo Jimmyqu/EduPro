@@ -10,13 +10,26 @@ import { Toaster } from './ui/sonner';
 
 import { Section, sectionRoutes, routeSections } from '../types/navigation';
 
+// 定义需要登录的页面路径
+const PROTECTED_ROUTES = [
+  '/dashboard',
+  '/courses',
+  '/videos',
+  '/pdfs',
+  '/exercises',
+  '/exams',
+  '/profile',
+  '/applications',
+  '/coursewares'
+];
+
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const router = useRouter();
   
   // 检测是否为移动设备
@@ -34,6 +47,20 @@ export default function Layout({ children }: LayoutProps) {
       window.removeEventListener('resize', checkIfMobile);
     };
   }, []);
+
+  // 检查用户登录状态和路由保护
+  useEffect(() => {
+    if (!isLoading) {
+      const currentPath = router.pathname;
+      const isProtectedRoute = PROTECTED_ROUTES.some(route => currentPath.startsWith(route));
+      
+      // 如果是受保护的路由但用户未登录，重定向到首页
+      if (isProtectedRoute && !user) {
+        console.log('未登录用户访问受保护页面，重定向到首页');
+        router.push('/');
+      }
+    }
+  }, [user, isLoading, router]);
   
   const currentSection = routeSections[router.pathname];
   const isLandingPage = router.pathname === '/';
@@ -50,6 +77,40 @@ export default function Layout({ children }: LayoutProps) {
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
+
+  // 检查当前路由是否需要登录
+  const currentPath = router.pathname;
+  const isProtectedRoute = PROTECTED_ROUTES.some(route => currentPath.startsWith(route));
+
+  // 如果正在加载，显示加载状态
+  if (isLoading) {
+    return (
+      <ThemeProvider attribute="class">
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">正在加载...</p>
+          </div>
+        </div>
+        <Toaster />
+      </ThemeProvider>
+    );
+  }
+
+  // 如果是受保护的路由但用户未登录，不渲染内容（因为会被重定向）
+  if (isProtectedRoute && !user) {
+    return (
+      <ThemeProvider attribute="class">
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">正在跳转...</p>
+          </div>
+        </div>
+        <Toaster />
+      </ThemeProvider>
+    );
+  }
 
   // 如果用户未登录或在首页，不显示导航header
   if (!user || isLandingPage) {
