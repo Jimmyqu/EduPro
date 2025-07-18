@@ -208,10 +208,10 @@ export function UserProfile({ onBack }: UserProfileProps) {
     <div className="p-6">
       <div className="max-w-4xl mx-auto">
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="profile">个人资料</TabsTrigger>
             <TabsTrigger value="courses">课程信息</TabsTrigger>
-            <TabsTrigger value="applications">申请记录</TabsTrigger>
+            {/* <TabsTrigger value="applications">申请记录</TabsTrigger> */}
           </TabsList>
 
           <TabsContent value="profile" className="space-y-6">

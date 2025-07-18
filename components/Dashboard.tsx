@@ -399,10 +399,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     // if (!course.is_enrollment_open) {
                     //   return <Badge variant="outline" className="text-xs">报名已结束</Badge>;
                     // }
-                    if (course.requires_approval) {
-                      return <Badge variant="secondary" className="text-xs">需要通过</Badge>;
-                    }
-                    return <Badge variant="default" className="text-xs">可直接报名</Badge>;
+                    // if (course.requires_approval) {
+                    //   return <Badge variant="secondary" className="text-xs">需要通过</Badge>;
+                    // }
+                    // return <Badge variant="default" className="text-xs">可直接报名</Badge>;
                   };
 
                   const getLevelBadge = (level: string) => {
@@ -497,30 +497,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         </div>
                       )}
 
-                      {/* 课程状态提示 */}
-                      {!hasUserAccess && (
-                        <div className={`mb-3 p-2 rounded border ${
-                          course.can_enroll ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
-                        }`}>
-                          <div className="flex items-center space-x-2">
-                            {course.can_enroll ? (
-                              <>
-                                <AlertCircle className="h-4 w-4 text-blue-600" />
-                                <span className="text-xs text-blue-700">
-                                  {course.requires_approval ? '点击申请报名' : '点击直接报名'}
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <Lock className="h-4 w-4 text-gray-500" />
-                                <span className="text-xs text-gray-600">
-                                  {!course.is_enrollment_open ? '报名时间已过' : '暂不可报名'}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
+           
 
                       <div className="flex space-x-2 mt-auto">
                         {hasUserAccess ? (
@@ -534,22 +511,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                           >
                             开始学习
                           </Button>
-                        ) : (
-                          <Button 
-                            size="sm" 
-                            className="flex-1"
-                            disabled={!course.can_enroll}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (course.can_enroll) {
-                                // 直接显示报名确认弹窗
-                                showEnrollDialog(course);
-                              }
-                            }}
-                          >
-                            {course.can_enroll ? (course.requires_approval ? '申请报名' : '立即报名') : '暂不可报名'}
-                          </Button>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   );
