@@ -125,7 +125,7 @@ export function CoursesList() {
       return <Badge variant="outline">报名已结束</Badge>;
     }
     if (course.requires_approval) {
-      return <Badge variant="secondary">需要审核</Badge>;
+      return <Badge variant="secondary">需要通过</Badge>;
     }
     return <Badge variant="default">可直接报名</Badge>;
   };
@@ -293,7 +293,7 @@ export function CoursesList() {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Users className="h-4 w-4" />
                     <span>
-                      {course.current_student_count} 人已选课
+                      {course.current_student_count} 人可学习
                     </span>
                   </div>
 
@@ -317,7 +317,7 @@ export function CoursesList() {
                     {course.requires_approval && (
                       <div className="flex items-center gap-1 text-blue-600">
                         <CheckCircle className="h-3 w-3" />
-                        <span className="text-xs">需要审核</span>
+                        <span className="text-xs">需要通过</span>
                       </div>
                     )}
                   </div>

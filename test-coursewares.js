@@ -23,7 +23,7 @@ async function testCoursewaresAPI() {
       console.log('- 标题:', firstCourseware.title);
       console.log('- 内容URL:', firstCourseware.content_url);
       console.log('- 时长:', firstCourseware.duration_minutes);
-      console.log('- 是否已选课:', firstCourseware.is_enrolled);
+      console.log('- 是否可学习:', firstCourseware.is_enrolled);
       
       if (firstCourseware.course) {
         console.log('- 所属课程:', firstCourseware.course.title);

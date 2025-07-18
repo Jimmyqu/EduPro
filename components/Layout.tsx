@@ -134,7 +134,7 @@ export default function Layout({ children }: LayoutProps) {
                   className="text-xl cursor-pointer text-primary hover:text-primary/90 transition-colors"
                   onClick={handleBackToDashboard}
                 >
-                  教育学习平台
+                  学习资料
                 </h1>
               </div>
               

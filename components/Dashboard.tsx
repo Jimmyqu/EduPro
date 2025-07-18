@@ -188,10 +188,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       let response;
       if (course.requires_approval) {
-        // 需要审核的课程，调用申请接口
+        // 需要通过的课程，调用申请接口
         response = await apiService.applyCourse(course.course_id, applicationReason);
       } else {
-        // 不需要审核的课程，直接选课
+        // 不需要通过的课程，直接选课
         response = await apiService.enrollCourse(course.course_id);
       }
       
@@ -276,7 +276,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
     .slice(0, 2);
 
-  // 按权限状态排序课程：已选课程在前，未选课程在后
+  // 按权限状态排序课程：可学习程在前，未选课程在后
   const sortedCourses = [...allCourses].sort((a, b) => {
     const aHasAccess = hasAccess(a.course_id.toString());
     const bHasAccess = hasAccess(b.course_id.toString());
@@ -393,14 +393,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   // 获取课程状态信息
                   const getEnrollmentStatusBadge = () => {
                     if (hasUserAccess) {
-                      return <Badge variant="default" className="bg-green-100 text-green-800 text-xs">已选课</Badge>;
+                      return <Badge variant="default" className="bg-green-100 text-green-800 text-xs">可学习</Badge>;
                     }
                     // 移除报名时间检查，课程随时可报名
                     // if (!course.is_enrollment_open) {
                     //   return <Badge variant="outline" className="text-xs">报名已结束</Badge>;
                     // }
                     if (course.requires_approval) {
-                      return <Badge variant="secondary" className="text-xs">需要审核</Badge>;
+                      return <Badge variant="secondary" className="text-xs">需要通过</Badge>;
                     }
                     return <Badge variant="default" className="text-xs">可直接报名</Badge>;
                   };
@@ -432,8 +432,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       }`}
                       onClick={() => {
                         if (hasUserAccess) {
-                          // 已选课程，显示课程信息
-                          console.log('已选课程:', course);
+                          // 可学习程，显示课程信息
+                          console.log('可学习程:', course);
                         } else if (course.can_enroll) {
                           // 未选课程，直接显示报名确认弹窗
                           showEnrollDialog(course);
@@ -481,7 +481,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         )}
                       </div>
 
-                      {/* 已选课显示学习进度 */}
+                      {/* 可学习显示学习进度 */}
                       {hasUserAccess && userProgress && (
                         <div className="mb-3">
                           <div className="flex justify-between text-xs text-gray-600 mb-1">
@@ -507,7 +507,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                               <>
                                 <AlertCircle className="h-4 w-4 text-blue-600" />
                                 <span className="text-xs text-blue-700">
-                                  {course.requires_approval ? '点击申请报名（需要审核）' : '点击直接报名'}
+                                  {course.requires_approval ? '点击申请报名' : '点击直接报名'}
                                 </span>
                               </>
                             ) : (
@@ -630,12 +630,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                             </div>
                             
                             {/* 审核通过时间 */}
-                            {enrollment.approved_at && (
+                            {/* {enrollment.approved_at && (
                               <div className="text-sm">
                                 <span className="text-gray-500">审核通过时间: </span>
                                 <span>{new Date(enrollment.approved_at).toLocaleDateString('zh-CN')}</span>
                               </div>
-                            )}
+                            )} */}
                             
                             {/* 学习期限信息 */}
                             <div className="grid grid-cols-2 gap-4 text-sm">

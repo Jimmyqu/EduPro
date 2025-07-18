@@ -378,12 +378,12 @@ export function UserProfile({ onBack }: UserProfileProps) {
                                 </div>
                                 
                                 {/* 审核通过时间 */}
-                                {enrollment.approved_at && (
+                                {/* {enrollment.approved_at && (
                                   <div className="mt-4 text-sm text-gray-600">
                                     <span className="font-medium">审核通过时间: </span>
                                     {formatDateTime(enrollment.approved_at)}
                                   </div>
-                                )}
+                                )} */}
                                 
                                 {/* 学习期限警告 */}
                                 {isExpiringSoon && !isExpired && (

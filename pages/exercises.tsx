@@ -97,7 +97,7 @@ export default function ExercisesPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-bold">练习中心</h1>
-                <p className="text-gray-600">查看已选课程的练习内容</p>
+                <p className="text-gray-600">查看可学习程的练习内容</p>
               </div>
               
               {/* 搜索 */}
@@ -154,7 +154,7 @@ export default function ExercisesPage() {
                       <PenTool className="h-12 w-12 text-gray-400 mb-4" />
                       <h3 className="text-lg text-gray-600 mb-2">暂无练习课程</h3>
                       <p className="text-gray-500 text-center mb-4">
-                        {searchTerm ? "没有找到匹配的课程" : "您的已选课程中暂无练习内容"}
+                        {searchTerm ? "没有找到匹配的课程" : "您的可学习程中暂无练习内容"}
                       </p>
                       {searchTerm && (
                         <Button onClick={() => {

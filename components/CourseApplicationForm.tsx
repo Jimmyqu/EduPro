@@ -55,10 +55,10 @@ const CourseApplicationForm: React.FC<CourseApplicationFormProps> = ({
       let response;
       
       if (course.requires_approval) {
-        // 需要审核，提交申请
+        // 需要通过，提交申请
         response = await apiService.applyCourse(course.course_id, applicationReason);
       } else {
-        // 不需要审核，直接选课
+        // 不需要通过，直接选课
         response = await apiService.enrollCourse(course.course_id);
       }
       

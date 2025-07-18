@@ -364,7 +364,7 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
                                   "border-gray-300 text-gray-600"
                                 }
                               >
-                                {video.is_enrolled ? "已选课" : "未选课"}
+                                {video.is_enrolled ? "可学习" : "未选课"}
                               </Badge>
                             </div>
                           </div>

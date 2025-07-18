@@ -108,7 +108,7 @@ export function CourseCard({ course, type, onSelect }: CourseCardProps) {
               "bg-gray-800 text-white"
             }
           >
-            {course.is_enrolled ? "已选课" : "未选课"}
+            {course.is_enrolled ? "可学习" : "未选课"}
           </Badge>
         </div>
       </div>

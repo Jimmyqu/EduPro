@@ -97,7 +97,7 @@ export default function VideosPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-bold">视频中心</h1>
-                <p className="text-gray-600">查看已选课程的视频内容</p>
+                <p className="text-gray-600">查看可学习程的视频内容</p>
               </div>
               
               {/* 搜索 */}
@@ -105,7 +105,7 @@ export default function VideosPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="搜索已选课程..."
+                    placeholder="搜索可学习程..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -154,7 +154,7 @@ export default function VideosPage() {
                       <Play className="h-12 w-12 text-gray-400 mb-4" />
                       <h3 className="text-lg text-gray-600 mb-2">暂无视频课程</h3>
                       <p className="text-gray-500 text-center mb-4">
-                        {searchTerm ? "没有找到匹配的课程" : "您的已选课程中暂无视频内容"}
+                        {searchTerm ? "没有找到匹配的课程" : "您的可学习程中暂无视频内容"}
                       </p>
                       {searchTerm && (
                         <Button onClick={() => {

@@ -131,7 +131,7 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
         // TODO: 打开PDF查看器
       }
       
-      // 更新学习进度（如果已选课）
+      // 更新学习进度（如果可学习）
       if (courseware.course && courseware.is_enrolled) {
         apiService.updateCoursewareProgress(
           courseware.course.id,
@@ -215,7 +215,7 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
                                 "border-gray-300 text-gray-600"
                               }
                             >
-                              {courseware.is_enrolled ? "已选课" : "未选课"}
+                              {courseware.is_enrolled ? "可学习" : "未选课"}
                             </Badge>
                             <Badge variant="secondary" className="text-xs">
                               {courseware.course.category}

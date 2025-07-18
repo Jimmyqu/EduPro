@@ -30,7 +30,7 @@ export function LoginForm({ setShowRegister }: { setShowRegister: (show: boolean
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-[500px] flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl flex items-center justify-center gap-2">
@@ -102,9 +102,9 @@ export function LoginForm({ setShowRegister }: { setShowRegister: (show: boolean
 
         <CardFooter className="justify-center">
           <div className="text-center">
-            <Button variant="link" onClick={() => setShowRegister(true)}>
+            {/* <Button variant="link" onClick={() => setShowRegister(true)}>
               没有账号？注册一个
-            </Button>
+            </Button> */}
           </div>
         </CardFooter>
       </Card>

@@ -76,7 +76,7 @@ export default function PDFsPage() {
     router.push('/dashboard');
   };
 
-  // courses 现在是 Enrollment 数组，已经都是已选课的课程
+  // courses 现在是 Enrollment 数组，已经都是可学习的课程
 
   if (selectedCourseId) {
     // 二级页面：显示特定课程的PDF课件（无导航栏）
@@ -106,7 +106,7 @@ export default function PDFsPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold">课件中心</h1>
-              <p className="text-gray-600">查看已选课程的PDF课件资料</p>
+              <p className="text-gray-600">查看可学习程的PDF课件资料</p>
             </div>
             
             {/* 搜索 */}
@@ -114,7 +114,7 @@ export default function PDFsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="搜索已选课程..."
+                  placeholder="搜索可学习程..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -163,7 +163,7 @@ export default function PDFsPage() {
                     <FileText className="h-12 w-12 text-gray-400 mb-4" />
                     <h3 className="text-lg text-gray-600 mb-2">暂无PDF课件</h3>
                     <p className="text-gray-500 text-center mb-4">
-                      {searchTerm ? "没有找到匹配的课程" : "您的已选课程中暂无PDF课件"}
+                      {searchTerm ? "没有找到匹配的课程" : "您的可学习程中暂无PDF课件"}
                     </p>
                     {searchTerm && (
                       <Button onClick={() => {

@@ -379,7 +379,7 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
                                   "border-gray-300 text-gray-600"
                                 }
                               >
-                                {pdf.is_enrolled ? "已选课" : "未选课"}
+                                {pdf.is_enrolled ? "可学习" : "未选课"}
                               </Badge>
                             </div>
                           </div>

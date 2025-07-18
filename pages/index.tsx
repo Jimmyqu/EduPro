@@ -75,7 +75,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-primary">教育学习平台</h1>
+              <h1 className="text-2xl font-bold text-primary">学习资料</h1>
             </div>
             <div className="flex items-center space-x-4">
               <ThemeToggle />
@@ -85,11 +85,11 @@ export default function Home() {
               >
                 登录
               </Button>
-              <Button 
+              {/* <Button 
                 onClick={() => setShowRegister(true)}
               >
                 注册
-              </Button>
+              </Button> */}
             </div>
           </div>
         </div>
@@ -98,28 +98,14 @@ export default function Home() {
       {/* Hero Section */}
       <section className="py-20 text-center">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-6">
-            专业的在线
-            <span className="text-primary block">教育学习平台</span>
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            提供全面的学习资源、互动练习和模拟考试，助您高效提升专业技能，实现职业发展目标。
-          </p>
+        
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
               size="lg" 
-              onClick={() => setShowRegister(true)}
-              className="text-lg px-8 py-6"
-            >
-              立即开始学习
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline"
               onClick={() => setShowLogin(true)}
               className="text-lg px-8 py-6"
             >
-              已有账号登录
+              立即开始学习
             </Button>
           </div>
         </div>
@@ -128,13 +114,8 @@ export default function Home() {
       {/* Features Section */}
       <section className="py-20 bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              为什么选择我们
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              我们提供全方位的学习支持，让您的学习更高效、更系统、更有成效
-            </p>
+          <div className="text-center h-10 mb-16">
+     
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -211,13 +192,6 @@ export default function Home() {
       <footer className="bg-card border-t py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h3 className="text-2xl font-bold mb-4 text-foreground">教育学习平台</h3>
-            <p className="text-muted-foreground mb-4">
-              致力于提供高质量的在线教育服务
-            </p>
-            <p className="text-muted-foreground text-sm">
-              © 2024 教育学习平台. 保留所有权利.
-            </p>
           </div>
         </div>
       </footer>
@@ -234,7 +208,7 @@ export default function Home() {
             </button>
             <div className="p-6">
               <LoginForm setShowRegister={() => setShowRegister(true)} />
-              <p className="text-center mt-4 text-sm text-muted-foreground">
+              {/* <p className="text-center mt-4 text-sm text-muted-foreground">
                 还没有账号？
                 <button 
                   onClick={() => {
@@ -245,7 +219,7 @@ export default function Home() {
                 >
                   立即注册
                 </button>
-              </p>
+              </p> */}
             </div>
           </div>
         </div>
