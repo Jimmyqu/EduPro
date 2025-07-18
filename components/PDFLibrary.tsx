@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 
-import { Search, FileText, Download, Calendar, Lock, Users, Star, Clock, Loader2, AlertCircle } from "lucide-react";
+import { Search, FileText, Download, Calendar, Lock, Users, Star, Clock, Loader2, AlertCircle, Eye } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { apiService, isApiSuccess } from "../lib/api";
@@ -168,9 +168,10 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
   };
 
   // PDF操作处理
-  const handlePDFAction = async (pdf: any, action: 'download') => {
+  const handlePDFAction = async (pdf: any, action: 'download' | 'view') => {
     if (!pdf.is_enrolled) {
-      toast.warning("需要先选择该课程才能下载PDF", {
+      const actionText = action === 'download' ? '下载' : '查看';
+      toast.warning(`需要先选择该课程才能${actionText}PDF`, {
         description: "请在课程中心选择对应的课程"
       });
       return;
@@ -187,7 +188,8 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
       
       // 如果是OSS链接，需要获取签名URL
       if (fileUrl) {
-        toast.loading("正在获取文件下载链接...", { id: 'oss-loading' });
+        const loadingText = action === 'download' ? "正在获取文件下载链接..." : "正在获取文件查看链接...";
+        toast.loading(loadingText, { id: 'oss-loading' });
         
         const response = await apiService.getOSSSignedUrl(fileUrl);
         
@@ -196,21 +198,29 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
           toast.dismiss('oss-loading');
         } else {
           toast.dismiss('oss-loading');
-          toast.error(response.message || "获取文件下载链接失败");
+          const errorText = action === 'download' ? "获取文件下载链接失败" : "获取文件查看链接失败";
+          toast.error(response.message || errorText);
           return;
         }
       }
 
-      // 创建下载链接
-      const link = document.createElement('a');
-      link.href = fileUrl;
-      link.download = `${pdf.title}.pdf`;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast.success(`开始下载：${pdf.title}`);
+      if (action === 'download') {
+        // 下载功能 - 使用原始OSS URL
+        const link = document.createElement('a');
+        link.href = fileUrl; // 使用原始URL，不替换域名
+        link.download = `${pdf.title}.pdf`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast.success(`开始下载：${pdf.title}`);
+      } else if (action === 'view') {
+        // 查看功能 - 替换为自定义域名后在新窗口中打开PDF
+        const viewUrl = fileUrl.replace("austin-edu-pro.oss-rg-china-mainland.aliyuncs.com", "image.19920316.xyz");
+        window.open(viewUrl, '_blank');
+        toast.success(`正在打开：${pdf.title}`);
+      }
       
       // 更新学习进度
       if (pdf.course && pdf.is_enrolled) {
@@ -221,8 +231,9 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
         );
       }
     } catch (error) {
-      console.error('PDF下载失败:', error);
-      toast.error("下载失败，请稍后重试");
+      const actionText = action === 'download' ? '下载' : '查看';
+      console.error(`PDF${actionText}失败:`, error);
+      toast.error(`${actionText}失败，请稍后重试`);
     }
   };
 
@@ -396,6 +407,24 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
                           {/* 操作按钮 */}
                           <div className="flex space-x-2">
                             <Button
+                              onClick={() => handlePDFAction(pdf, 'view')}
+                              variant="outline"
+                              className="flex-1"
+                              disabled={!pdf.is_enrolled}
+                            >
+                              {pdf.is_enrolled ? (
+                                <>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  查看
+                                </>
+                              ) : (
+                                <>
+                                  <Lock className="h-4 w-4 mr-2" />
+                                  需要选课
+                                </>
+                              )}
+                            </Button>
+                            <Button
                               onClick={() => handlePDFAction(pdf, 'download')}
                               className="flex-1"
                               disabled={!pdf.is_enrolled}
@@ -466,7 +495,6 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
           </>
         )}
       </div>
-
 
     </div>
   );
