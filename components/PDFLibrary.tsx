@@ -3,8 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
-import { Search, FileText, Download, Calendar, Lock, Users, Star, Clock, Loader2, AlertCircle, Eye } from "lucide-react";
+import { Search, FileText, Download, Calendar, Lock, Users, Star, Clock, Loader2, AlertCircle, Eye, ArrowLeft } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { apiService, isApiSuccess } from "../lib/api";
@@ -23,6 +24,8 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [categories, setCategories] = useState<string[]>([]);
   const { user } = useAuth();
 
   // 初始化状态
@@ -38,7 +41,7 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
       if (courseId) {
         const params = {
           page: 1,
-          per_page: 12,
+          per_page: 100,
           course_id: courseId
         };
         
@@ -50,6 +53,14 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
           const pdfCoursewares = allCoursewares.filter(courseware => 
             courseware.type === 'pdf' || courseware.content_url?.includes('.pdf')
           );
+          
+          // 提取所有课件分类
+          const allCategories = Array.from(new Set(
+            pdfCoursewares
+              .map(cw => cw.category)
+              .filter((category): category is string => Boolean(category)) // 过滤掉null和undefined，并进行类型断言
+          ));
+          setCategories(allCategories);
           
           setPdfDocuments(pdfCoursewares);
           setTotalPages(response.data.total_pages);
@@ -71,6 +82,14 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
           const pdfCoursewares = allCoursewares.filter(courseware => 
             courseware.type === 'pdf' || courseware.content_url?.includes('.pdf')
           );
+          
+          // 提取所有课件分类
+          const allCategories = Array.from(new Set(
+            pdfCoursewares
+              .map(cw => cw.category)
+              .filter((category): category is string => Boolean(category)) // 过滤掉null和undefined，并进行类型断言
+          ));
+          setCategories(allCategories);
           
           setPdfDocuments(pdfCoursewares);
           setTotalPages(coursewaresResponse.data.total_pages);
@@ -96,7 +115,7 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
   };
 
   // 获取PDF课件列表（用于搜索、筛选、分页等操作）
-  const fetchPDFs = async (page = 1, search = "", courseId?: string) => {
+  const fetchPDFs = async (page = 1, search = "", courseId?: string, category = "all") => {
     try {
       setLoading(true);
       
@@ -122,7 +141,12 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
           courseware.type === 'pdf' || courseware.content_url?.includes('.pdf')
         );
         
-        setPdfDocuments(pdfCoursewares);
+        // 根据分类筛选
+        const filteredPDFs = category === "all" 
+          ? pdfCoursewares 
+          : pdfCoursewares.filter(cw => cw.category === category);
+        
+        setPdfDocuments(filteredPDFs);
         setTotalPages(response.data.total_pages);
         setTotal(response.data.total);
         setCurrentPage(page);
@@ -152,19 +176,26 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
   // 搜索处理
   const handleSearch = () => {
     setCurrentPage(1);
-    fetchPDFs(1, searchTerm, selectedCourse || undefined);
+    fetchPDFs(1, searchTerm, selectedCourse || undefined, selectedCategory);
   };
 
   // 课程筛选
   const handleCourseSelect = (courseId: string | null) => {
     setSelectedCourse(courseId);
     setCurrentPage(1);
-    fetchPDFs(1, searchTerm, courseId || undefined);
+    fetchPDFs(1, searchTerm, courseId || undefined, selectedCategory);
+  };
+  
+  // 分类筛选处理
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    setCurrentPage(1);
+    fetchPDFs(1, searchTerm, selectedCourse || undefined, category);
   };
 
   // 分页处理
   const handlePageChange = (page: number) => {
-    fetchPDFs(page, searchTerm, selectedCourse || undefined);
+    fetchPDFs(page, searchTerm, selectedCourse || undefined, selectedCategory);
   };
 
   // PDF操作处理
@@ -271,53 +302,68 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 搜索和筛选 */}
-        <div className="mb-8 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <div className="relative flex-1 max-w-md">
+        <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
+          <div className="flex items-center">
+            <div>
+              <p className="text-gray-600">
+                {courseId ? "课程PDF资料" : "所有PDF学习资料"}
+                {total > 0 && ` · 共 ${total} 份资料`}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="搜索PDF标题..."
+                placeholder="搜索PDF名称..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10"
+                className="pl-10 w-64"
               />
             </div>
-            <Button onClick={handleSearch}>搜索</Button>
-          </div>
+            
+            <Button onClick={handleSearch} variant="outline">
+              搜索
+            </Button>
+            
+            {/* 课程筛选 */}
+            {!courseId && courses.length > 0 && (
+              <div>
+                <Select value={selectedCourse || "all"} onValueChange={(value) => handleCourseSelect(value === "all" ? null : value)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="选择课程" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部课程</SelectItem>
+                    {courses.map(course => (
+                      <SelectItem key={course.course_id} value={course.course_id.toString()}>
+                        {course.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-          {/* 课程筛选 - 只在没有传入courseId时显示 */}
-          {!courseId && (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedCourse === null ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleCourseSelect(null)}
-              >
-                全部课程
-              </Button>
-              {courses.map((course) => {
-                const stats = getCourseStats(course.course_id.toString());
-                return (
-                  <Button
-                    key={course.course_id}
-                    variant={selectedCourse === course.course_id.toString() ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleCourseSelect(course.course_id.toString())}
-                    className="flex items-center space-x-2"
-                  >
-                    <span>{course.title}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {stats.enrolled}/{stats.total}
-                    </Badge>
-                  </Button>
-                );
-              })}
+            {/* 分类筛选 */}
+            <div>
+              <Select onValueChange={handleCategoryChange} value={selectedCategory}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="选择分类" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部分类</SelectItem>
+                  {categories.map(category => (
+                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+          </div>
         </div>
 
         {/* 加载状态 */}

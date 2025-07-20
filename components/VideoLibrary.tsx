@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Play, Clock, Search, ArrowLeft, Lock, BookOpen, Users, Star, Loader2, AlertCircle, Eye } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
@@ -25,10 +26,12 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [showPlayer, setShowPlayer] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [categories, setCategories] = useState<string[]>([]);
   const { user } = useAuth();
 
   // 获取视频课件列表
-  const fetchVideos = async (page = 1, search = "", courseId?: string) => {
+  const fetchVideos = async (page = 1, search = "", courseId?: string, category = "all") => {
     try {
       setLoading(true);
       
@@ -54,7 +57,12 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
           courseware.content_url?.includes('.mp4')
         );
         
-        setVideos(videoCoursewares);
+        // 根据分类筛选
+        const filteredVideos = category === "all" 
+          ? videoCoursewares 
+          : videoCoursewares.filter(cw => cw.category === category);
+        
+        setVideos(filteredVideos);
         setTotalPages(response.data.total_pages);
         setTotal(response.data.total);
         setCurrentPage(page);
@@ -95,6 +103,14 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
             courseware.content_url?.includes('.mp4')
           );
           
+          // 提取所有课件分类
+          const allCategories = Array.from(new Set(
+            videoCoursewares
+              .map(cw => cw.category)
+              .filter((category): category is string => Boolean(category)) // 过滤掉null和undefined，并进行类型断言
+          ));
+          setCategories(allCategories);
+          
           setVideos(videoCoursewares);
           setTotalPages(response.data.total_pages);
           setTotal(response.data.total);
@@ -115,6 +131,14 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
           const videoCoursewares = allCoursewares.filter(courseware => 
             courseware.content_url?.includes('.mp4')
           );
+          
+          // 提取所有课件分类
+          const allCategories = Array.from(new Set(
+            videoCoursewares
+              .map(cw => cw.category)
+              .filter((category): category is string => Boolean(category)) // 过滤掉null和undefined，并进行类型断言
+          ));
+          setCategories(allCategories);
           
           setVideos(videoCoursewares);
           setTotalPages(coursewaresResponse.data.total_pages);
@@ -154,19 +178,26 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
   // 搜索处理
   const handleSearch = () => {
     setCurrentPage(1);
-    fetchVideos(1, searchTerm, selectedCourse || undefined);
+    fetchVideos(1, searchTerm, selectedCourse || undefined, selectedCategory);
   };
 
   // 课程筛选
   const handleCourseSelect = (courseId: string | null) => {
     setSelectedCourse(courseId);
     setCurrentPage(1);
-    fetchVideos(1, searchTerm, courseId || undefined);
+    fetchVideos(1, searchTerm, courseId || undefined, selectedCategory);
+  };
+  
+  // 分类筛选处理
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    setCurrentPage(1);
+    fetchVideos(1, searchTerm, selectedCourse || undefined, category);
   };
 
   // 分页处理
   const handlePageChange = (page: number) => {
-    fetchVideos(page, searchTerm, selectedCourse || undefined);
+    fetchVideos(page, searchTerm, selectedCourse || undefined, selectedCategory);
   };
 
   // 播放视频
@@ -248,50 +279,73 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 搜索和筛选 */}
-        <div className="mb-8 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <div className="relative flex-1 max-w-md">
+        <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
+          <div className="flex items-center">
+            <Button variant="outline" onClick={onBack} className="mr-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              返回
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">视频课程</h1>
+              <p className="text-gray-600">
+                {courseId ? "课程视频列表" : "所有视频课程"}
+                {total > 0 && ` · 共 ${total} 个视频`}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="搜索视频标题..."
+                placeholder="搜索视频名称..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10"
+                className="pl-10 w-64"
               />
             </div>
-            <Button onClick={handleSearch}>搜索</Button>
-          </div>
+            
+            <Button onClick={handleSearch} variant="outline">
+              搜索
+            </Button>
+            
+            {/* 课程筛选 */}
+            {!courseId && courses.length > 0 && (
+              <div>
+                <Select value={selectedCourse || "all"} onValueChange={(value) => handleCourseSelect(value === "all" ? null : value)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="选择课程" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部课程</SelectItem>
+                    {courses.map(course => (
+                      <SelectItem key={course.course_id} value={course.course_id.toString()}>
+                        {course.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-          {/* 课程筛选 - 只在没有传入courseId时显示 */}
-          {!courseId && (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedCourse === null ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleCourseSelect(null)}
-              >
-                全部课程
-              </Button>
-              {courses.map((course) => {
-                const stats = getCourseStats(course.course_id.toString());
-                return (
-                  <Button
-                    key={course.course_id}
-                    variant={selectedCourse === course.course_id.toString() ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleCourseSelect(course.course_id.toString())}
-                    className="flex items-center space-x-2"
-                  >
-                    <span>{course.title}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {stats.enrolled}/{stats.total}
-                    </Badge>
-                  </Button>
-                );
-              })}
-            </div>
-          )}
+            {/* 分类筛选 */}
+            {categories.length > 0 && (
+              <div>
+                <Select onValueChange={handleCategoryChange} value={selectedCategory}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="选择分类" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部分类</SelectItem>
+                    {categories.map(category => (
+                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 加载状态 */}
@@ -429,7 +483,7 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
                   {searchTerm && (
                     <Button onClick={() => {
                       setSearchTerm("");
-                      fetchVideos(1, "");
+                      fetchVideos(1, "", selectedCourse || undefined, selectedCategory);
                     }}>
                       清除搜索
                     </Button>

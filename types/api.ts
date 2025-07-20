@@ -33,6 +33,7 @@ export interface ApiCourseware {
   order_index: number;
   course?: ApiCourse;
   is_enrolled?: boolean;
+  category?: string;
 }
 
 export interface ApiCoursewareListResponse {
@@ -116,6 +117,7 @@ export function convertApiCoursewareToLocal(apiCourseware: ApiCourseware) {
     content_url: apiCourseware.content_url,
     duration_minutes: apiCourseware.duration_minutes,
     order_index: apiCourseware.order_index,
+    category: apiCourseware.category,
     course: apiCourseware.course ? convertApiCourseToLocal(apiCourseware.course) : undefined,
     is_enrolled: apiCourseware.is_enrolled || false,
     // 判断课件类型
@@ -200,14 +202,21 @@ export function convertEnrollmentToProgress(enrollment: any) {
     return null;
   }
 
-  const { course, stats, enrolled_at, remaining_days } = enrollment;
-  
-  // 检查必需字段
-  if (!course || !course.course_id) {
-    console.error('convertEnrollmentToProgress: course or course.course_id is undefined', enrollment);
+  // 提前检查course对象
+  if (!enrollment.course) {
+    console.error('convertEnrollmentToProgress: course is undefined', enrollment);
     return null;
   }
 
+  // 检查course.id (注意：这里使用id而不是course_id，因为convertApiCourseToLocal已经转换过)
+  if (!enrollment.course.id && enrollment.course.id !== '0') {
+    console.error('convertEnrollmentToProgress: course.id is undefined', enrollment.course);
+    return null;
+  }
+
+  const { course, stats, enrolled_at, remaining_days } = enrollment;
+  
+  // 检查stats是否存在
   if (!stats) {
     console.error('convertEnrollmentToProgress: stats is undefined', enrollment);
     return null;
@@ -218,21 +227,26 @@ export function convertEnrollmentToProgress(enrollment: any) {
     ? Math.round((stats.completed_coursewares / stats.total_coursewares) * 100)
     : 0;
 
-  return {
-    courseId: course.course_id.toString(),
-    courseName: course.title || '未知课程',
-    category: course.category || '未分类',
-    totalVideos: stats.total_videos || 0,
-    watchedVideos: stats.viewed_videos || 0,
-    totalExercises: 0, // 暂未提供练习统计
-    completedExercises: 0,
-    totalPDFs: stats.total_documents || 0,
-    readPDFs: stats.viewed_documents || 0,
-    studyHours: Math.round(((stats.completed_coursewares || 0) * 0.5)), // 估算学习时长：每个课件0.5小时
-    lastActivity: enrolled_at || new Date().toISOString(), // 使用选课时间作为最后活动时间
-    completionPercentage,
-    remainingDays: remaining_days || 0 // 添加剩余学习天数
-  };
+  try {
+    return {
+      courseId: course.id, // 使用id而不是course_id
+      courseName: course.title || course.name || '未知课程',
+      category: course.category || '未分类',
+      totalVideos: stats.total_videos || 0,
+      watchedVideos: stats.viewed_videos || 0,
+      totalExercises: 0, // 暂未提供练习统计
+      completedExercises: 0,
+      totalPDFs: stats.total_documents || 0,
+      readPDFs: stats.viewed_documents || 0,
+      studyHours: Math.round(((stats.completed_coursewares || 0) * 0.5)), // 估算学习时长：每个课件0.5小时
+      lastActivity: enrolled_at || new Date().toISOString(), // 使用选课时间作为最后活动时间
+      completionPercentage,
+      remainingDays: remaining_days || 0 // 添加剩余学习天数
+    };
+  } catch (error) {
+    console.error('convertEnrollmentToProgress: 转换过程出错', error, enrollment);
+    return null;
+  }
 } 
 
 // ==================== 练习和考试相关类型 ====================

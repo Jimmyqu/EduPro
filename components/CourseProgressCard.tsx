@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Progress } from "./ui/progress";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Play, BookOpen, FileText, Clock, TrendingUp } from "lucide-react";
+import { Play, BookOpen, FileText, Clock } from "lucide-react";
 import { CourseProgress } from "../contexts/AuthContext";
 import { Section } from "../types/navigation";
 
@@ -14,122 +14,79 @@ interface CourseProgressCardProps {
 export function CourseProgressCard({ course, onNavigate }: CourseProgressCardProps) {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('zh-CN', {
-      month: 'short',
+      month: 'numeric',
       day: 'numeric',
     });
   };
 
-  const getProgressColor = (percentage: number) => {
-    if (percentage >= 80) return 'text-green-600';
-    if (percentage >= 60) return 'text-blue-600';
-    if (percentage >= 40) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  const getCategoryColor = (category: string) => {
-    const colors: { [key: string]: string } = {
-      Mathematics: 'bg-blue-100 text-blue-800',
-      Physics: 'bg-purple-100 text-purple-800',
-      Chemistry: 'bg-green-100 text-green-800',
-      Biology: 'bg-orange-100 text-orange-800',
-      History: 'bg-yellow-100 text-yellow-800',
-      Literature: 'bg-pink-100 text-pink-800',
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800';
-  };
-
   return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <CardTitle className="text-lg">{course.courseName}</CardTitle>
-            <Badge className={getCategoryColor(course.category)}>
+    <Card className="hover:shadow-sm transition-shadow">
+      <CardContent className="p-4 space-y-3">
+        {/* 课程标题和进度 */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="font-medium">{course.courseName}</h3>
+            <p className="text-xs text-gray-500">
               {course.category}
-            </Badge>
+            </p>
           </div>
-          <div className="flex items-center space-x-2 text-sm text-gray-500">
-            <TrendingUp className="h-4 w-4" />
-            <span className={getProgressColor(course.completionPercentage)}>
-              {course.completionPercentage}%
-            </span>
+          <div className="text-right">
+            <span className="text-sm font-medium">{course.completionPercentage}%</span>
           </div>
         </div>
-        <CardDescription>
+        
+        {/* 最后学习时间 */}
+        <p className="text-xs text-gray-500">
           最后学习: {formatDate(course.lastActivity)}
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
-        {/* 总体进度 */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">总体进度</span>
-            <span className="text-sm">{course.completionPercentage}%</span>
-          </div>
-          <Progress value={course.completionPercentage} className="h-2" />
-        </div>
-
-        {/* 详细进度 */}
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-1 text-gray-600">
-              <Play className="h-3 w-3" />
-              <span>视频</span>
-            </div>
-            <div className="font-medium">
-              {course.watchedVideos}/{course.totalVideos}
-            </div>
+        </p>
+        
+        {/* 总体进度条 */}
+        <Progress value={course.completionPercentage} className="h-1.5" />
+        
+        {/* 学习统计 */}
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="text-center">
+            <div className="font-medium">视频</div>
+            <div className="text-gray-700">{course.watchedVideos}/{course.totalVideos}</div>
             <Progress 
-              value={(course.watchedVideos / course.totalVideos) * 100} 
-              className="h-1" 
+              value={(course.watchedVideos / (course.totalVideos || 1)) * 100} 
+              className="h-1 mt-1" 
             />
           </div>
           
-          <div className="space-y-1">
-            <div className="flex items-center space-x-1 text-gray-600">
-              <BookOpen className="h-3 w-3" />
-              <span>练习</span>
-            </div>
-            <div className="font-medium">
-              {course.completedExercises}/{course.totalExercises}
-            </div>
+          <div className="text-center">
+            <div className="font-medium">练习</div>
+            <div className="text-gray-700">{course.completedExercises}/{course.totalExercises || 20}</div>
             <Progress 
-              value={(course.completedExercises / course.totalExercises) * 100} 
-              className="h-1" 
+              value={(course.completedExercises / (course.totalExercises || 20)) * 100} 
+              className="h-1 mt-1" 
             />
           </div>
           
-          <div className="space-y-1">
-            <div className="flex items-center space-x-1 text-gray-600">
-              <FileText className="h-3 w-3" />
-              <span>资料</span>
-            </div>
-            <div className="font-medium">
-              {course.readPDFs}/{course.totalPDFs}
-            </div>
+          <div className="text-center">
+            <div className="font-medium">资料</div>
+            <div className="text-gray-700">{course.readPDFs}/{course.totalPDFs || 15}</div>
             <Progress 
-              value={(course.readPDFs / course.totalPDFs) * 100} 
-              className="h-1" 
+              value={(course.readPDFs / (course.totalPDFs || 15)) * 100} 
+              className="h-1 mt-1" 
             />
           </div>
         </div>
 
         {/* 学习时长 */}
-        <div className="flex items-center justify-between pt-2 border-t">
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <Clock className="h-4 w-4" />
-            <span>学习时长: {course.studyHours}小时 · 剩余: {course.remainingDays}天</span>
+        <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center text-xs text-gray-600">
+            <Clock className="h-3 w-3 mr-1" />
+            <span>学习时长: {course.studyHours}小时</span>
           </div>
-          <div className="flex space-x-2">
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => onNavigate('videos')}
-            >
-              继续学习
-            </Button>
-          </div>
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={() => onNavigate('videos')}
+            className="h-7 text-xs"
+          >
+            继续学习
+          </Button>
         </div>
       </CardContent>
     </Card>

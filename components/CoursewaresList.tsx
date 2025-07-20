@@ -34,9 +34,11 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [categories, setCategories] = useState<string[]>([]);
 
   // 获取课件列表
-  const fetchCoursewares = async (page = 1, search = "") => {
+  const fetchCoursewares = async (page = 1, search = "", category = "all") => {
     try {
       setLoading(true);
       
@@ -57,7 +59,21 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
       
       if (isApiSuccess(response)) {
         const convertedCoursewares = response.data.coursewares.map(convertApiCoursewareToLocal);
-        setCoursewares(convertedCoursewares);
+        
+        // 提取所有课件分类
+        const allCategories = Array.from(new Set(
+          convertedCoursewares
+            .map(cw => cw.category)
+            .filter(Boolean) // 过滤掉null和undefined
+        ));
+        setCategories(allCategories);
+        
+        // 根据分类筛选
+        const filteredCoursewares = category === "all" 
+          ? convertedCoursewares 
+          : convertedCoursewares.filter(cw => cw.category === category);
+        
+        setCoursewares(filteredCoursewares);
         setTotalPages(response.data.total_pages);
         setTotal(response.data.total);
         setCurrentPage(page);
@@ -80,12 +96,19 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
   // 搜索处理
   const handleSearch = () => {
     setCurrentPage(1);
-    fetchCoursewares(1, searchTerm);
+    fetchCoursewares(1, searchTerm, selectedCategory);
+  };
+
+  // 分类筛选处理
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    setCurrentPage(1);
+    fetchCoursewares(1, searchTerm, category);
   };
 
   // 分页处理
   const handlePageChange = (page: number) => {
-    fetchCoursewares(page, searchTerm);
+    fetchCoursewares(page, searchTerm, selectedCategory);
   };
 
   // 获取课件类型图标
@@ -157,7 +180,7 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
         </div>
         
         {/* 搜索和筛选 */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -168,6 +191,22 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
               className="pl-10 w-64"
             />
           </div>
+          
+          {/* 分类筛选 */}
+          <Select value={selectedCategory} onValueChange={handleCategoryChange}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="分类筛选" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部分类</SelectItem>
+              {categories.map((category, index) => (
+                <SelectItem key={index} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
           <Button onClick={handleSearch} variant="outline">
             搜索
           </Button>
@@ -217,9 +256,11 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
                             >
                               {courseware.is_enrolled ? "可学习" : "未选课"}
                             </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              {courseware.course.category}
-                            </Badge>
+                            {courseware.category && (
+                              <Badge variant="secondary" className="text-xs">
+                                {courseware.category}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       )}
@@ -305,14 +346,15 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
                 <FileText className="h-12 w-12 text-gray-400 mb-4" />
                 <h3 className="text-lg text-gray-600 mb-2">暂无课件</h3>
                 <p className="text-gray-500 text-center mb-4">
-                  {searchTerm ? "没有找到匹配的课件" : "还没有上传任何课件"}
+                  {searchTerm || selectedCategory !== "all" ? "没有找到匹配的课件" : "还没有上传任何课件"}
                 </p>
-                {searchTerm && (
+                {(searchTerm || selectedCategory !== "all") && (
                   <Button onClick={() => {
                     setSearchTerm("");
-                    fetchCoursewares(1, "");
+                    setSelectedCategory("all");
+                    fetchCoursewares(1, "", "all");
                   }}>
-                    清除搜索
+                    清除筛选
                   </Button>
                 )}
               </CardContent>

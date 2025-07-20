@@ -108,24 +108,53 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const allCoursesData = allCoursesResponse.data.courses;
 
       // 直接从enrollment数据创建课程进度信息（使用新的stats字段）
+      console.log('准备转换课程进度，myCoursesData:', JSON.stringify(myCoursesData));
       const courseProgress = myCoursesData
-        .map(convertEnrollmentToProgress)
+        .map(enrollment => {
+          console.log('处理单个enrollment:', JSON.stringify(enrollment));
+          console.log('enrollment.course:', enrollment.course);
+          // 使用id而不是course_id，因为convertApiCourseToLocal已经将course_id转换为id
+          console.log('enrollment.course.id:', enrollment.course?.id);
+          const progress = convertEnrollmentToProgress(enrollment);
+          console.log('转换后的progress:', progress);
+          return progress;
+        })
         .filter(progress => progress !== null); // 过滤掉转换失败的数据
+      
+      console.log('最终的courseProgress:', courseProgress);
 
       // 计算学习统计（使用新的stats数据）
       const studyStats = {
-        videosWatched: myCoursesData.reduce((sum, enrollment) => sum + (enrollment.stats?.viewed_videos || 0), 0),
+        videosWatched: myCoursesData.reduce((sum, enrollment) => {
+          console.log('计算videosWatched:', enrollment.stats?.viewed_videos);
+          return sum + (enrollment.stats?.viewed_videos || 0);
+        }, 0),
         exercisesCompleted: 0, // 暂未提供练习统计
-        pdfsRead: myCoursesData.reduce((sum, enrollment) => sum + (enrollment.stats?.viewed_documents || 0), 0),
-        studyHours: courseProgress.reduce((sum, course) => sum + (course.studyHours || 0), 0)
+        pdfsRead: myCoursesData.reduce((sum, enrollment) => {
+          console.log('计算pdfsRead:', enrollment.stats?.viewed_documents);
+          return sum + (enrollment.stats?.viewed_documents || 0);
+        }, 0),
+        studyHours: courseProgress.reduce((sum, course) => {
+          console.log('计算studyHours:', course?.studyHours);
+          return sum + (course?.studyHours || 0);
+        }, 0)
       };
+      
+      console.log('计算得到的studyStats:', studyStats);
 
       // 更新状态
+      const enrolledCourses = myCoursesData.map(c => {
+        console.log('提取enrolledCourses的course.id:', c.course?.id);
+        return c.course?.id;
+      }).filter(id => id !== undefined);
+      
+      console.log('enrolledCourses:', enrolledCourses);
+
       setDashboardData({
         user: {
           ...userData,
           studyStats,
-          enrolledCourses: myCoursesData.map(c => c.course.id),
+          enrolledCourses,
           courseProgress
         },
         myCourses: myCoursesData,
@@ -155,8 +184,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }, [authUser]);
 
   // 检查用户是否有课程访问权限
-  const hasAccess = (courseId: string): boolean => {
-    return dashboardData.user?.enrolledCourses?.includes(courseId) || false;
+  const hasAccess = (courseId: string | number): boolean => {
+    // 确保courseId是字符串类型
+    const courseIdStr = courseId?.toString();
+    // 安全检查
+    if (!courseIdStr || !dashboardData.user?.enrolledCourses) {
+      return false;
+    }
+    return dashboardData.user.enrolledCourses.includes(courseIdStr);
   };
 
   // 显示权限提示
@@ -278,8 +313,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   // 按权限状态排序课程：可学习程在前，未选课程在后
   const sortedCourses = [...allCourses].sort((a, b) => {
-    const aHasAccess = hasAccess(a.course_id.toString());
-    const bHasAccess = hasAccess(b.course_id.toString());
+    // 安全检查，确保course_id存在并转换为字符串
+    const aId = a.course_id?.toString();
+    const bId = b.course_id?.toString();
+    
+    // 如果id不存在，将其排在后面
+    if (!aId) return 1;
+    if (!bId) return -1;
+    
+    const aHasAccess = hasAccess(aId);
+    const bHasAccess = hasAccess(bId);
     
     if (aHasAccess && !bHasAccess) return -1;
     if (!aHasAccess && bHasAccess) return 1;
@@ -375,6 +418,94 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           )}
 
           {/* All Courses Overview - 显示所有课程，区分权限状态 */}
+          
+          {/* 学习资源卡片区域 */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {/* 学习课件卡片 */}
+            <div 
+              className="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-all flex flex-col"
+              onClick={() => onNavigate('coursewares')}
+            >
+              <div className="flex items-center space-x-2 mb-2">
+                <FileText className="h-5 w-5" />
+                <h3 className="leading-none">学习课件</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">下载课件材料和参考文档</p>
+              <div className="text-xs">教材和课程资料</div>
+              <div className="mt-auto pt-2">
+                <Button size="sm" className="w-full" onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigate('pdfs');
+                }}>
+                  查看课件
+                </Button>
+              </div>
+            </div>
+
+            {/* 视频学习卡片 */}
+            <div 
+              className="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-all flex flex-col"
+              onClick={() => onNavigate('videos')}
+            >
+              <div className="flex items-center space-x-2 mb-2">
+                <Play className="h-5 w-5" />
+                <h3 className="leading-none">视频学习</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">观看专业培训视频课程</p>
+              <div className="text-xs">已报名课程</div>
+              <div className="mt-auto pt-2">
+                <Button size="sm" className="w-full" onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigate('videos');
+                }}>
+                  开始学习
+                </Button>
+              </div>
+            </div>
+
+            {/* 练习测试卡片 */}
+            <div 
+              className="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-all flex flex-col"
+              onClick={() => onNavigate('exercises')}
+            >
+              <div className="flex items-center space-x-2 mb-2">
+                <BookOpen className="h-5 w-5" />
+                <h3 className="leading-none">练习测试</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">通过测验检验学习成果</p>
+              <div className="text-xs">巩固专业知识</div>
+              <div className="mt-auto pt-2">
+                <Button size="sm" className="w-full" onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigate('exercises');
+                }}>
+                  开始练习
+                </Button>
+              </div>
+            </div>
+
+            {/* 模拟考试卡片 */}
+            <div 
+              className="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-all flex flex-col"
+              onClick={() => onNavigate('exams')}
+            >
+                <div className="flex items-center space-x-2 mb-2">
+                <ClipboardCheck className="h-5 w-5" />
+                <h3 className="leading-none">模拟考试</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">正式考试模拟，全面评估能力</p>
+              <div className="text-xs">检验学习成果</div>
+              <div className="mt-auto pt-2">
+                <Button size="sm" className="w-full" onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigate('exams');
+                }}>
+                  参加考试
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -386,9 +517,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {sortedCourses.map(course => {
-                  const hasUserAccess = hasAccess(course.course_id.toString());
-                  const userProgress = courseProgress.find(p => p.courseId === course.course_id.toString());
-                  const userEnrollment = myCourses.find(e => e.course.course_id === course.course_id);
+                  // 安全检查，确保course_id存在
+                  const courseId = course.course_id?.toString();
+                  if (!courseId) {
+                    console.error('课程缺少course_id:', course);
+                    return null; // 跳过没有ID的课程
+                  }
+                  
+                  const hasUserAccess = hasAccess(courseId);
+                  const userProgress = courseProgress.find(p => p.courseId === courseId);
+                  const userEnrollment = myCourses.find(e => e.course?.id === courseId);
                   
                   // 获取课程状态信息
                   const getEnrollmentStatusBadge = () => {
@@ -466,16 +604,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       
                       {/* 简化的课程信息 */}
                       <div className="text-xs text-gray-500 space-y-1 mb-3">
-                        <div className="flex items-center gap-2">
+                        {/* <div className="flex items-center gap-2">
                           <Clock className="h-3 w-3" />
                           <span>学习期限: {course.learning_days} 天</span>
                         </div>
-                        
+                         */}
                         {hasUserAccess && userEnrollment && (
                           <div className="flex items-center gap-2">
                             <AlertCircle className="h-3 w-3" />
                             <span className="text-orange-600">
-                              剩余学习天数: {userEnrollment.remaining_days !== undefined ? `${userEnrollment.remaining_days} 天` : '计算中...'}
+                              剩余时间: {userEnrollment.remaining_days !== undefined ? `${userEnrollment.remaining_days} 天` : '计算中...'}
                             </span>
                           </div>
                         )}
@@ -542,7 +680,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     return new Date(b.enrolled_at).getTime() - new Date(a.enrolled_at).getTime();
                   })
                   .map(enrollment => {
-                    const progress = courseProgress.find(p => p.courseId === enrollment.course.course_id.toString());
+                    // 安全检查，确保course存在
+                    if (!enrollment.course) {
+                      console.error('enrollment缺少course:', enrollment);
+                      return null; // 跳过没有course的enrollment
+                    }
+                    
+                    const courseId = enrollment.course.id;
+                    if (!courseId) {
+                      console.error('enrollment.course缺少id:', enrollment.course);
+                      return null; // 跳过没有id的course
+                    }
+                    
+                    const progress = courseProgress.find(p => p.courseId === courseId);
                     
                     // 计算到期时间
                     const getExpiryDate = () => {
@@ -557,119 +707,110 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     const isExpired = enrollment.remaining_days <= 0;
                     
                     return (
-                      <Card key={enrollment.enrollment_id} className="hover:shadow-lg transition-shadow border-green-200 bg-green-50/30">
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <CardTitle className="text-lg">{enrollment.course.title}</CardTitle>
-                            <div className="flex flex-col gap-1">
-                              <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
-                                已通过
-                              </Badge>
-                              {enrollment.course.level && (
-                                <Badge variant="outline" className="text-xs">
-                                  {enrollment.course.level === 'beginner' ? '初级' :
-                                   enrollment.course.level === 'intermediate' ? '中级' : '高级'}
-                                </Badge>
-                              )}
+                      <div 
+                        key={enrollment.enrollment_id} 
+                        className="p-4 border rounded-lg transition-all hover:shadow-md"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <h4 className="font-medium">{enrollment.course.title}</h4>
+                            <p className="text-xs text-gray-500">
+                              {enrollment.course.category || '健康管理'}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <p className="text-xs text-gray-500 mb-2">
+                          总体进度: {new Date(enrollment.enrolled_at).toLocaleDateString('zh-CN', {month: 'numeric', day: 'numeric'})}日
+                        </p>
+                        
+                        {/* 总体进度条 - 使用stats中的视频和文档数据计算 */}
+                        {(() => {
+                          // 计算总体进度
+                          const totalItems = (enrollment.stats?.total_videos || 0) + (enrollment.stats?.total_documents || 0);
+                          const viewedItems = (enrollment.stats?.viewed_videos || 0) + (enrollment.stats?.viewed_documents || 0);
+                          const overallProgress = totalItems > 0 ? Math.round((viewedItems / totalItems) * 100) : 0;
+                          
+                          return (
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 mb-3">
+                              <div 
+                                className="bg-primary h-1.5 rounded-full" 
+                                style={{ width: `${overallProgress}%` }}
+                              ></div>
+                            </div>
+                          );
+                        })()}
+                        
+                        {/* 学习统计 */}
+                        <div className="grid grid-cols-3 gap-2 text-xs mb-3">
+                          <div className="text-center">
+                            <div className="font-medium">视频</div>
+                            <div className="text-gray-700">
+                              {enrollment.stats?.viewed_videos || 0}/{enrollment.stats?.total_videos || 0}
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                              <div 
+                                className="bg-primary h-1 rounded-full" 
+                                style={{ 
+                                  width: `${enrollment.stats?.total_videos > 0 
+                                    ? (enrollment.stats.viewed_videos / enrollment.stats.total_videos) * 100 
+                                    : 0}%` 
+                                }}
+                              ></div>
                             </div>
                           </div>
-                          <CardDescription>
-                            {enrollment.course.description || '暂无课程描述'}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-3">
-                            {/* 课程基本信息 */}
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="text-gray-500">学习期限: </span>
-                                <span>{enrollment.course.learning_days} 天</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">选课时间: </span>
-                                <span>{new Date(enrollment.enrolled_at).toLocaleDateString('zh-CN')}</span>
-                              </div>
+                          
+                          <div className="text-center">
+                            <div className="font-medium">练习</div>
+                            <div className="text-gray-700">
+                              {enrollment.stats?.participated_exercises || 0}/{enrollment.stats?.total_exercises || 0}
                             </div>
-                            
-                            {/* 审核通过时间 */}
-                            {/* {enrollment.approved_at && (
-                              <div className="text-sm">
-                                <span className="text-gray-500">审核通过时间: </span>
-                                <span>{new Date(enrollment.approved_at).toLocaleDateString('zh-CN')}</span>
-                              </div>
-                            )} */}
-                            
-                            {/* 学习期限信息 */}
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="text-gray-500">到期时间: </span>
-                                <span className={isExpired ? 'text-red-600 font-medium' : isExpiringSoon ? 'text-orange-600 font-medium' : ''}>
-                                  {getExpiryDate()}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">剩余天数: </span>
-                                <span className={
-                                  isExpired ? 'text-red-600 font-medium' :
-                                  isExpiringSoon ? 'text-orange-600 font-medium' : 'text-green-600'
-                                }>
-                                  {isExpired ? '已过期' : `${enrollment.remaining_days} 天`}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            {/* 过期警告 */}
-                            {isExpiringSoon && !isExpired && (
-                              <div className="bg-orange-100 border border-orange-200 rounded p-3 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <AlertCircle className="h-4 w-4 text-orange-600" />
-                                  <span className="text-orange-800">
-                                    课程即将到期，请抓紧时间学习！
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {isExpired && (
-                              <div className="bg-red-100 border border-red-200 rounded p-3 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <AlertCircle className="h-4 w-4 text-red-600" />
-                                  <span className="text-red-800">
-                                    课程学习期限已过期，无法继续学习
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* 学习进度 */}
-                            {progress && (
-                              <div>
-                                <div className="flex justify-between text-sm text-gray-600 mb-1">
-                                  <span>学习进度</span>
-                                  <span>{progress.completionPercentage}%</span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2">
-                                  <div 
-                                    className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                                    style={{ width: `${progress.completionPercentage}%` }}
-                                  ></div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* 操作按钮 */}
-                            <div className="flex gap-2 pt-2">
-                              <Button 
-                                onClick={() => onNavigate('videos')} 
-                                className="flex-1"
-                                disabled={isExpired}
-                              >
-                                {isExpired ? '课程已过期' : '开始学习'}
-                              </Button>
+                            <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                              <div 
+                                className="bg-primary h-1 rounded-full" 
+                                style={{ 
+                                  width: `${enrollment.stats?.total_exercises > 0 
+                                    ? (enrollment.stats.participated_exercises / enrollment.stats.total_exercises) * 100 
+                                    : 0}%` 
+                                }}
+                              ></div>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
+                          
+                          <div className="text-center">
+                            <div className="font-medium">资料</div>
+                            <div className="text-gray-700">
+                              {enrollment.stats?.viewed_documents || 0}/{enrollment.stats?.total_documents || 0}
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                              <div 
+                                className="bg-primary h-1 rounded-full" 
+                                style={{ 
+                                  width: `${enrollment.stats?.total_documents > 0 
+                                    ? (enrollment.stats.viewed_documents / enrollment.stats.total_documents) * 100 
+                                    : 0}%` 
+                                }}
+                              ></div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* 学习时长和按钮 */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center text-xs text-gray-600">
+                            <Clock className="h-3 w-3 mr-1" />
+                            <span>学习时长: {Math.round(((enrollment.stats?.viewed_videos || 0) * 0.5) + ((enrollment.stats?.viewed_documents || 0) * 0.3))}小时</span>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => onNavigate('videos')}
+                            className="h-7 text-xs"
+                          >
+                            继续学习
+                          </Button>
+                        </div>
+                      </div>
                     );
                   })}
               </div>
