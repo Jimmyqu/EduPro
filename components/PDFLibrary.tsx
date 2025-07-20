@@ -62,9 +62,11 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
           ));
           setCategories(allCategories);
           
-          setPdfDocuments(pdfCoursewares);
-          setTotalPages(response.data.total_pages);
-          setTotal(response.data.total);
+          // 存储所有PDF数据
+          setAllPdfDocuments(pdfCoursewares);
+          setFilteredPdfDocuments(pdfCoursewares);
+          setTotal(pdfCoursewares.length);
+          setTotalPages(Math.ceil(pdfCoursewares.length / itemsPerPage));
           setCurrentPage(1);
         } else {
           toast.error("获取PDF列表失败", { description: response.message });
@@ -91,9 +93,11 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
           ));
           setCategories(allCategories);
           
-          setPdfDocuments(pdfCoursewares);
-          setTotalPages(coursewaresResponse.data.total_pages);
-          setTotal(coursewaresResponse.data.total);
+          // 存储所有PDF数据
+          setAllPdfDocuments(pdfCoursewares);
+          setFilteredPdfDocuments(pdfCoursewares);
+          setTotal(pdfCoursewares.length);
+          setTotalPages(Math.ceil(pdfCoursewares.length / itemsPerPage));
           setCurrentPage(1);
         } else {
           toast.error("获取PDF列表失败", { description: coursewaresResponse.message });
@@ -114,51 +118,45 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
     }
   };
 
-  // 获取PDF课件列表（用于搜索、筛选、分页等操作）
-  const fetchPDFs = async (page = 1, search = "", courseId?: string, category = "all") => {
-    try {
-      setLoading(true);
-      
-      const params: any = {
-        page,
-        per_page: 12,
-      };
-      
-      if (search.trim()) {
-        params.search = search.trim();
-      }
-      
-      if (courseId) {
-        params.course_id = parseInt(courseId);
-      }
-      
-      const response = await apiService.getCoursewares(params);
-      
-      if (isApiSuccess(response)) {
-        // 只显示PDF类型的课件
-        const allCoursewares = response.data.coursewares.map(convertApiCoursewareToLocal);
-        const pdfCoursewares = allCoursewares.filter(courseware => 
-          courseware.type === 'pdf' || courseware.content_url?.includes('.pdf')
-        );
-        
-        // 根据分类筛选
-        const filteredPDFs = category === "all" 
-          ? pdfCoursewares 
-          : pdfCoursewares.filter(cw => cw.category === category);
-        
-        setPdfDocuments(filteredPDFs);
-        setTotalPages(response.data.total_pages);
-        setTotal(response.data.total);
-        setCurrentPage(page);
-      } else {
-        toast.error("获取PDF列表失败", { description: response.message });
-      }
-    } catch (error) {
-      console.error("获取PDF列表失败:", error);
-      toast.error("获取PDF列表失败", { description: "请稍后重试" });
-    } finally {
-      setLoading(false);
+  // 存储所有PDF数据用于前端筛选
+  const [allPdfDocuments, setAllPdfDocuments] = useState<any[]>([]);
+  const [filteredPdfDocuments, setFilteredPdfDocuments] = useState<any[]>([]);
+  const itemsPerPage = 12;
+
+  // 前端筛选和搜索逻辑
+  const filterPDFs = (search = "", courseId?: string, category = "all") => {
+    let filtered = [...allPdfDocuments];
+    
+    // 课程筛选
+    if (courseId) {
+      filtered = filtered.filter(pdf => pdf.course?.id === courseId);
     }
+    
+    // 分类筛选
+    if (category !== "all") {
+      filtered = filtered.filter(pdf => pdf.category === category);
+    }
+    
+    // 搜索筛选
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(pdf => 
+        pdf.title.toLowerCase().includes(searchLower) ||
+        pdf.course?.name.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    setFilteredPdfDocuments(filtered);
+    setTotal(filtered.length);
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+    setCurrentPage(1);
+  };
+
+  // 获取当前页的PDF数据
+  const getCurrentPagePDFs = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredPdfDocuments.slice(startIndex, endIndex);
   };
 
   // 使用ref防止在严格模式下重复调用API
@@ -175,27 +173,24 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
 
   // 搜索处理
   const handleSearch = () => {
-    setCurrentPage(1);
-    fetchPDFs(1, searchTerm, selectedCourse || undefined, selectedCategory);
+    filterPDFs(searchTerm, selectedCourse || undefined, selectedCategory);
   };
 
   // 课程筛选
   const handleCourseSelect = (courseId: string | null) => {
     setSelectedCourse(courseId);
-    setCurrentPage(1);
-    fetchPDFs(1, searchTerm, courseId || undefined, selectedCategory);
+    filterPDFs(searchTerm, courseId || undefined, selectedCategory);
   };
   
   // 分类筛选处理
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
-    setCurrentPage(1);
-    fetchPDFs(1, searchTerm, selectedCourse || undefined, category);
+    filterPDFs(searchTerm, selectedCourse || undefined, category);
   };
 
   // 分页处理
   const handlePageChange = (page: number) => {
-    fetchPDFs(page, searchTerm, selectedCourse || undefined, selectedCategory);
+    setCurrentPage(page);
   };
 
   // PDF操作处理
@@ -270,11 +265,11 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
 
   // 课程统计
   const getEnrolledPDFsCount = () => {
-    return pdfDocuments.filter(pdf => pdf.is_enrolled).length;
+    return filteredPdfDocuments.filter(pdf => pdf.is_enrolled).length;
   };
 
   const getCourseStats = (courseId: string) => {
-    const coursePDFs = pdfDocuments.filter(pdf => pdf.course?.id === courseId);
+    const coursePDFs = allPdfDocuments.filter(pdf => pdf.course?.id === courseId);
     const enrolledPDFs = coursePDFs.filter(pdf => pdf.is_enrolled);
     return {
       total: coursePDFs.length,
@@ -320,21 +315,21 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
               <Input
                 placeholder="搜索PDF名称..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  // 实时搜索
+                  filterPDFs(e.target.value, selectedCourse || undefined, selectedCategory);
+                }}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 className="pl-10 w-64"
               />
             </div>
             
-            <Button onClick={handleSearch} variant="outline">
-              搜索
-            </Button>
-            
             {/* 课程筛选 */}
             {!courseId && courses.length > 0 && (
               <div>
                 <Select value={selectedCourse || "all"} onValueChange={(value) => handleCourseSelect(value === "all" ? null : value)}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[180px] !bg-[#fff]">
                     <SelectValue placeholder="选择课程" />
                   </SelectTrigger>
                   <SelectContent>
@@ -352,7 +347,7 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
             {/* 分类筛选 */}
             <div>
               <Select onValueChange={handleCategoryChange} value={selectedCategory}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[180px] bg-white">
                   <SelectValue placeholder="选择分类" />
                 </SelectTrigger>
                 <SelectContent>
@@ -377,19 +372,26 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
         {/* PDF列表 */}
         {!loading && (
           <>
-            {pdfDocuments.length > 0 ? (
+            {filteredPdfDocuments.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {pdfDocuments.map((pdf) => (
+                  {getCurrentPagePDFs().map((pdf) => (
                     <Card key={pdf.id} className={`hover:shadow-lg transition-shadow ${
                       !pdf.is_enrolled ? 'opacity-75' : ''
                     }`}>
                       <CardHeader className="pb-3">
                         {/* 标题和缩略图布局 */}
                         <div className="flex items-start justify-between gap-4">
-                          <CardTitle className="text-lg line-clamp-2 flex-1">
-                            {pdf.title}
-                          </CardTitle>
+                          <div className="flex-1">
+                            <CardTitle className="text-lg line-clamp-2 mb-2">
+                              {pdf.title}
+                            </CardTitle>
+                            {pdf.category && (
+                              <Badge variant="outline" className="text-xs">
+                                {pdf.category}
+                              </Badge>
+                            )}
+                          </div>
                           
                           {/* PDF缩略图 */}
                           <div className="relative flex-shrink-0">
@@ -525,14 +527,16 @@ export function PDFLibrary({ onBack, courseId }: PDFLibraryProps) {
                   <FileText className="h-12 w-12 text-gray-400 mb-4" />
                   <h3 className="text-lg text-gray-600 mb-2">暂无PDF文档</h3>
                   <p className="text-gray-500 text-center mb-4">
-                    {searchTerm ? "没有找到匹配的PDF" : "还没有上传任何PDF课件"}
+                    {searchTerm || selectedCategory !== "all" || selectedCourse ? "没有找到匹配的PDF" : "还没有上传任何PDF课件"}
                   </p>
-                  {searchTerm && (
+                  {(searchTerm || selectedCategory !== "all" || selectedCourse) && (
                     <Button onClick={() => {
                       setSearchTerm("");
-                      fetchPDFs(1, "");
+                      setSelectedCategory("all");
+                      setSelectedCourse(null);
+                      filterPDFs("", undefined, "all");
                     }}>
-                      清除搜索
+                      清除筛选
                     </Button>
                   )}
                 </CardContent>

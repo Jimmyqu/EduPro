@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ArrowLeft, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { apiService } from '@/lib/api';
 import type { ApiExamDetail, Question, ExamQuestion, SubmitResult, QuestionResult } from '@/lib/api';
@@ -31,6 +32,12 @@ export default function ExerciseDetail() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmDialogConfig, setConfirmDialogConfig] = useState({
+    title: '',
+    description: '',
+    onConfirm: () => {}
+  });
 
   useEffect(() => {
     if (id) {
@@ -46,9 +53,12 @@ export default function ExerciseDetail() {
         setExercise(response.data);
       }
       
-      // 初始化用户答案数组
+      // 初始化用户答案数组，如果有上一次的答案则预填充
       if (response.data?.questions) {
-        setUserAnswers(response.data.questions.map(q => ({ questionId: q.question.question_id, answer: '' })));
+        setUserAnswers(response.data.questions.map(q => ({ 
+          questionId: q.question.question_id, 
+          answer: q.user_answer || '' // 使用上一次的答案，如果没有则为空
+        })));
       }
     } catch (err) {
       setError('加载练习详情失败');
@@ -126,10 +136,23 @@ export default function ExerciseDetail() {
     
     const unansweredCount = userAnswers.filter(ua => ua.answer.trim() === '').length;
     if (unansweredCount > 0) {
-      if (!confirm(`还有 ${unansweredCount} 道题未回答，确定要提交吗？`)) {
-        return;
-      }
+      setConfirmDialogConfig({
+        title: '确认提交',
+        description: `还有 ${unansweredCount} 道题未回答，确定要提交吗？`,
+        onConfirm: () => {
+          setShowConfirmDialog(false);
+          performSubmit();
+        }
+      });
+      setShowConfirmDialog(true);
+      return;
     }
+
+    performSubmit();
+  };
+
+  const performSubmit = async () => {
+    if (!exercise) return;
 
     try {
       setIsSubmitting(true);
@@ -137,16 +160,16 @@ export default function ExerciseDetail() {
       // 调用提交API
       const response = await apiService.submitExercise(exercise.exam_id, userAnswers);
       
-            if (response.code === 200 && response.data) {
+      if (response.code === 200 && response.data) {
         setSubmitResult(response.data);
         setIsSubmitted(true);
         // 提交成功，不需要alert，会显示成功页面
       } else {
-          setError(response.message || '提交失败，请重试');
-        }
-      } catch (err) {
-        console.error('Error submitting exercise:', err);
-        setError('网络错误，请检查网络连接后重试');
+        setError(response.message || '提交失败，请重试');
+      }
+    } catch (err) {
+      console.error('Error submitting exercise:', err);
+      setError('网络错误，请检查网络连接后重试');
     } finally {
       setIsSubmitting(false);
     }
@@ -402,6 +425,17 @@ export default function ExerciseDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {/* 确认对话框 */}
+        <ConfirmDialog
+          open={showConfirmDialog}
+          onOpenChange={setShowConfirmDialog}
+          title={confirmDialogConfig.title}
+          description={confirmDialogConfig.description}
+          onConfirm={confirmDialogConfig.onConfirm}
+          confirmText="确定提交"
+          cancelText="继续答题"
+        />
       </div>
     </div>
   );

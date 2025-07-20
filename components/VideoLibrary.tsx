@@ -30,51 +30,45 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
   const [categories, setCategories] = useState<string[]>([]);
   const { user } = useAuth();
 
-  // 获取视频课件列表
-  const fetchVideos = async (page = 1, search = "", courseId?: string, category = "all") => {
-    try {
-      setLoading(true);
-      
-      const params: any = {
-        page,
-        per_page: 12,
-      };
-      
-      if (search.trim()) {
-        params.search = search.trim();
-      }
-      
-      if (courseId) {
-        params.course_id = parseInt(courseId);
-      }
-      
-      const response = await apiService.getCoursewares(params);
-      
-      if (isApiSuccess(response)) {
-        // 只显示视频类型的课件
-        const allCoursewares = response.data.coursewares.map(convertApiCoursewareToLocal);
-        const videoCoursewares = allCoursewares.filter(courseware => 
-          courseware.content_url?.includes('.mp4')
-        );
-        
-        // 根据分类筛选
-        const filteredVideos = category === "all" 
-          ? videoCoursewares 
-          : videoCoursewares.filter(cw => cw.category === category);
-        
-        setVideos(filteredVideos);
-        setTotalPages(response.data.total_pages);
-        setTotal(response.data.total);
-        setCurrentPage(page);
-      } else {
-        toast.error("获取视频列表失败", { description: response.message });
-      }
-    } catch (error) {
-      console.error("获取视频列表失败:", error);
-      toast.error("获取视频列表失败", { description: "请稍后重试" });
-    } finally {
-      setLoading(false);
+  // 存储所有视频数据用于前端筛选
+  const [allVideos, setAllVideos] = useState<any[]>([]);
+  const [filteredVideos, setFilteredVideos] = useState<any[]>([]);
+  const itemsPerPage = 12;
+
+  // 前端筛选和搜索逻辑
+  const filterVideos = (search = "", courseId?: string, category = "all") => {
+    let filtered = [...allVideos];
+    
+    // 课程筛选
+    if (courseId) {
+      filtered = filtered.filter(video => video.course?.id === courseId);
     }
+    
+    // 分类筛选
+    if (category !== "all") {
+      filtered = filtered.filter(video => video.category === category);
+    }
+    
+    // 搜索筛选
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(video => 
+        video.title.toLowerCase().includes(searchLower) ||
+        video.course?.name.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    setFilteredVideos(filtered);
+    setTotal(filtered.length);
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+    setCurrentPage(1);
+  };
+
+  // 获取当前页的视频数据
+  const getCurrentPageVideos = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredVideos.slice(startIndex, endIndex);
   };
 
   // 获取所有课程列表用于筛选
@@ -111,9 +105,11 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
           ));
           setCategories(allCategories);
           
-          setVideos(videoCoursewares);
-          setTotalPages(response.data.total_pages);
-          setTotal(response.data.total);
+          // 存储所有视频数据
+          setAllVideos(videoCoursewares);
+          setFilteredVideos(videoCoursewares);
+          setTotal(videoCoursewares.length);
+          setTotalPages(Math.ceil(videoCoursewares.length / itemsPerPage));
           setCurrentPage(1);
         } else {
           toast.error("获取视频列表失败", { description: response.message });
@@ -140,9 +136,11 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
           ));
           setCategories(allCategories);
           
-          setVideos(videoCoursewares);
-          setTotalPages(coursewaresResponse.data.total_pages);
-          setTotal(coursewaresResponse.data.total);
+          // 存储所有视频数据
+          setAllVideos(videoCoursewares);
+          setFilteredVideos(videoCoursewares);
+          setTotal(videoCoursewares.length);
+          setTotalPages(Math.ceil(videoCoursewares.length / itemsPerPage));
           setCurrentPage(1);
         } else {
           toast.error("获取视频列表失败", { description: coursewaresResponse.message });
@@ -177,27 +175,24 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
 
   // 搜索处理
   const handleSearch = () => {
-    setCurrentPage(1);
-    fetchVideos(1, searchTerm, selectedCourse || undefined, selectedCategory);
+    filterVideos(searchTerm, selectedCourse || undefined, selectedCategory);
   };
 
   // 课程筛选
   const handleCourseSelect = (courseId: string | null) => {
     setSelectedCourse(courseId);
-    setCurrentPage(1);
-    fetchVideos(1, searchTerm, courseId || undefined, selectedCategory);
+    filterVideos(searchTerm, courseId || undefined, selectedCategory);
   };
   
   // 分类筛选处理
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
-    setCurrentPage(1);
-    fetchVideos(1, searchTerm, selectedCourse || undefined, category);
+    filterVideos(searchTerm, selectedCourse || undefined, category);
   };
 
   // 分页处理
   const handlePageChange = (page: number) => {
-    fetchVideos(page, searchTerm, selectedCourse || undefined, selectedCategory);
+    setCurrentPage(page);
   };
 
   // 播放视频
@@ -254,11 +249,11 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
 
   // 课程统计
   const getEnrolledVideosCount = () => {
-    return videos.filter(video => video.is_enrolled).length;
+    return filteredVideos.filter(video => video.is_enrolled).length;
   };
 
   const getCourseStats = (courseId: string) => {
-    const courseVideos = videos.filter(video => video.course?.id === courseId);
+    const courseVideos = allVideos.filter(video => video.course?.id === courseId);
     const enrolledVideos = courseVideos.filter(video => video.is_enrolled);
     return {
       total: courseVideos.length,
@@ -281,12 +276,7 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
         {/* 搜索和筛选 */}
         <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
           <div className="flex items-center">
-            <Button variant="outline" onClick={onBack} className="mr-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              返回
-            </Button>
             <div>
-              <h1 className="text-2xl font-bold">视频课程</h1>
               <p className="text-gray-600">
                 {courseId ? "课程视频列表" : "所有视频课程"}
                 {total > 0 && ` · 共 ${total} 个视频`}
@@ -300,15 +290,15 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
               <Input
                 placeholder="搜索视频名称..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  // 实时搜索
+                  filterVideos(e.target.value, selectedCourse || undefined, selectedCategory);
+                }}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 className="pl-10 w-64"
               />
             </div>
-            
-            <Button onClick={handleSearch} variant="outline">
-              搜索
-            </Button>
             
             {/* 课程筛选 */}
             {!courseId && courses.length > 0 && (
@@ -333,7 +323,7 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
             {categories.length > 0 && (
               <div>
                 <Select onValueChange={handleCategoryChange} value={selectedCategory}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[180px] bg-white">
                     <SelectValue placeholder="选择分类" />
                   </SelectTrigger>
                   <SelectContent>
@@ -359,10 +349,10 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
         {/* 视频列表 */}
         {!loading && (
           <>
-            {videos.length > 0 ? (
+            {filteredVideos.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {videos.map((video) => (
+                  {getCurrentPageVideos().map((video) => (
                     <Card 
                       key={video.id} 
                       className={`group hover:shadow-lg transition-all cursor-pointer ${
@@ -398,15 +388,22 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
                       </div>
 
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">
-                          {video.title}
-                        </CardTitle>
+                        <div className="space-y-2">
+                          <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">
+                            {video.title}
+                          </CardTitle>
+                          {video.category && (
+                            <Badge variant="outline" className="text-xs">
+                              {video.category}
+                            </Badge>
+                          )}
+                        </div>
                         
                         {video.course && (
                           <div className="space-y-2">
-                            <CardDescription className="text-sm">
+                            {/* <CardDescription className="text-sm">
                               课程：{video.course.name}
-                            </CardDescription>
+                            </CardDescription> */}
                             <div className="flex items-center gap-2">
                               <Badge variant="secondary" className="text-xs">
                                 {video.course.category}
@@ -478,14 +475,16 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
                   <Play className="h-12 w-12 text-gray-400 mb-4" />
                   <h3 className="text-lg text-gray-600 mb-2">暂无视频</h3>
                   <p className="text-gray-500 text-center mb-4">
-                    {searchTerm ? "没有找到匹配的视频" : "还没有上传任何视频课件"}
+                    {searchTerm || selectedCategory !== "all" || selectedCourse ? "没有找到匹配的视频" : "还没有上传任何视频课件"}
                   </p>
-                  {searchTerm && (
+                  {(searchTerm || selectedCategory !== "all" || selectedCourse) && (
                     <Button onClick={() => {
                       setSearchTerm("");
-                      fetchVideos(1, "", selectedCourse || undefined, selectedCategory);
+                      setSelectedCategory("all");
+                      setSelectedCourse(null);
+                      filterVideos("", undefined, "all");
                     }}>
-                      清除搜索
+                      清除筛选
                     </Button>
                   )}
                 </CardContent>

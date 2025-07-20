@@ -244,24 +244,22 @@ export interface Question {
   question_type: 'single_choice' | 'multiple_choice' | 'true_false' | 'fill_in_blank' | 'short_answer';
   content: string;
   options?: Record<string, string>;
+  correct_answer?: string;  // 正确答案（浏览模式下可见）
+  analysis?: string;        // 题目解析（浏览模式下可见）
+  explanation?: string;     // 兼容旧版本的解析字段
   difficulty: number;
   creator?: User;
 }
 
-// 考试题目
+// 考试题目（包含用户答案信息）
 export interface ExamQuestion {
   exam_question_id: number;
   question: Question;
   score: number;
   order_index: number;
-}
-
-// 考试题目
-export interface ExamQuestion {
-  exam_question_id: number;
-  question: Question;
-  score: number;
-  order_index: number;
+  user_answer?: string; // 用户的答案
+  is_correct?: boolean; // 是否答对
+  score_awarded?: number; // 获得的分数
 }
 
 // 考试/练习基本信息
@@ -679,6 +677,11 @@ export const apiService = {
   // 获取练习详情
   async getExerciseDetail(exerciseId: number): Promise<ApiResponse<ApiExamDetail>> {
     return apiRequest(`/exercises/${exerciseId}`);
+  },
+
+  // 获取练习浏览模式详情
+  async getExerciseBrowse(exerciseId: number): Promise<ApiResponse<ApiExamDetail>> {
+    return apiRequest(`/exercises/${exerciseId}/browse`);
   },
 
   // 获取考试详情

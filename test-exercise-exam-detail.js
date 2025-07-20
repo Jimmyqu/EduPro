@@ -38,34 +38,53 @@ async function testExerciseDetail() {
   console.log('\n🧪 测试练习详情页面...');
   
   try {
-    // 模拟访问练习详情页面
-    const exerciseDetailUrl = `${BASE_URL}/exercises/${TEST_DATA.exerciseId}`;
-    console.log(`📍 访问: ${exerciseDetailUrl}`);
-    
-    // 检查页面应该包含的关键元素
-    const expectedElements = [
-      '练习信息',
-      '题目导航', 
-      '完成进度',
-      '返回',
-      '提交练习'
+    // 测试不同的练习模式
+    const exerciseModes = [
+      {
+        url: `${BASE_URL}/exercises/${TEST_DATA.exerciseId}`,
+        mode: '练习模式',
+        description: '正常答题练习'
+      },
+      {
+        url: `${BASE_URL}/exercises/${TEST_DATA.exerciseId}/browse`,
+        mode: '浏览模式',
+        description: '查看题目、答案和解析'
+      },
+      {
+        url: `${BASE_URL}/exercises/${TEST_DATA.exerciseId}/start`,
+        mode: '开始练习',
+        description: '开始新的练习'
+      },
+      {
+        url: `${BASE_URL}/exercises/${TEST_DATA.exerciseId}/continue`,
+        mode: '继续练习',
+        description: '继续未完成的练习'
+      },
+      {
+        url: `${BASE_URL}/exercises/${TEST_DATA.exerciseId}/wrong-questions`,
+        mode: '错题练习',
+        description: '专门练习错误的题目'
+      }
     ];
     
-    console.log('✅ 练习详情页面应包含以下元素:');
-    expectedElements.forEach(element => {
-      console.log(`   - ${element}`);
+    console.log('✅ 练习系统支持以下模式:');
+    exerciseModes.forEach(mode => {
+      console.log(`   - ${mode.mode}: ${mode.description}`);
+      console.log(`     URL: ${mode.url}`);
     });
     
     // 测试功能点
     const functionalities = [
-      '加载练习详情数据',
+      '加载练习详情数据（包含用户答案）',
       '显示题目内容',
       '支持选择题和主观题',
       '答题进度跟踪',
       '题目间导航',
-      '答案保存',
+      '答案保存和预填充',
       '提交确认',
-      '提交成功反馈'
+      '提交成功反馈',
+      '浏览模式显示正确答案和解析',
+      '错题筛选和专项练习'
     ];
     
     console.log('✅ 练习详情页面应支持以下功能:');
@@ -170,8 +189,16 @@ async function testApiIntegration() {
       {
         endpoint: '/exercises/{id}',
         method: 'GET',
-        description: '获取练习详情',
-        expectedData: ['题目列表', '练习信息', '参与状态']
+        description: '获取练习详情（统一接口）',
+        expectedData: [
+          '题目列表', 
+          '练习信息', 
+          '参与状态',
+          '用户上次答案 (user_answer)',
+          '答案正确性 (is_correct)',
+          '获得分数 (score_awarded)',
+          '正确答案 (correct_answer)'
+        ]
       },
       {
         endpoint: '/exams/{id}', 
@@ -199,6 +226,16 @@ async function testApiIntegration() {
       console.log(`     用途: ${api.description}`);
       console.log(`     期望数据: ${api.expectedData.join(', ')}`);
     });
+    
+    console.log('\n📋 统一接口数据结构:');
+    console.log('ExamQuestion 接口应包含:');
+    console.log('  - exam_question_id: number');
+    console.log('  - question: Question (题目详情)');
+    console.log('  - score: number (题目分值)');
+    console.log('  - order_index: number (题目顺序)');
+    console.log('  - user_answer?: string (用户答案)');
+    console.log('  - is_correct?: boolean (是否正确)');
+    console.log('  - score_awarded?: number (获得分数)');
     
   } catch (error) {
     console.error('❌ API集成测试失败:', error.message);
