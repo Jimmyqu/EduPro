@@ -249,6 +249,7 @@ export interface Question {
   explanation?: string;     // 兼容旧版本的解析字段
   difficulty: number;
   creator?: User;
+  knowledge_points?: string[]; // 相关知识点
 }
 
 // 考试题目（包含用户答案信息）

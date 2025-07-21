@@ -64,7 +64,7 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
         const allCategories = Array.from(new Set(
           convertedCoursewares
             .map(cw => cw.category)
-            .filter(Boolean) // 过滤掉null和undefined
+            .filter((category): category is string => Boolean(category)) // 类型守卫确保过滤后都是string
         ));
         setCategories(allCategories);
         
