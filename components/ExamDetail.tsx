@@ -10,9 +10,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, CheckCircle, Clock, AlertCircle, Timer, BookOpen } from 'lucide-react';
-import { apiService } from '@/lib/api';
-import type { ApiExamDetail, Question, ExamQuestion } from '@/lib/api';
+import { ArrowLeft, CheckCircle, Clock, AlertCircle, Timer, BookOpen, Pause, Play, XCircle, Trophy } from 'lucide-react';
+import { apiService, isApiSuccess } from '@/lib/api';
+import type { ApiExamDetail, Question, ExamQuestion, ApiExamAttemptDetail, ExamAttempt, AnswerRecord } from '@/lib/api';
+import { toast } from 'sonner';
+import { Separator } from '@/components/ui/separator';
 
 interface UserAnswer {
   questionId: number;
@@ -33,17 +35,71 @@ export default function ExamDetail() {
   const [examStarted, setExamStarted] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [examProgress, setExamProgress] = useState<{
+    status: 'not_started' | 'in_progress' | 'paused' | 'submitted';
+    timeRemaining: number;
+    answers: UserAnswer[];
+    currentQuestionIndex: number;
+  } | null>(null);
+  
+  // 考试记录相关状态
+  const [examAttempt, setExamAttempt] = useState<ExamAttempt | null>(null);
+  const [attemptDetail, setAttemptDetail] = useState<ApiExamAttemptDetail | null>(null);
+  const [hasSubmittedAttempt, setHasSubmittedAttempt] = useState(false);
+  
+  // 对话框状态
+  const [showPauseDialog, setShowPauseDialog] = useState(false);
 
   useEffect(() => {
     if (id) {
+      // 只加载考试详情，答案恢复在 loadExamDetail 中处理
       loadExamDetail();
+      
+      // 恢复其他考试进度（时间、当前题目索引等）
+      const storageKey = `exam_progress_${id}`;
+      const savedProgress = localStorage.getItem(storageKey);
+      
+      if (savedProgress) {
+        try {
+          const progress = JSON.parse(savedProgress);
+          setExamProgress(progress);
+          
+          if (progress.status === 'in_progress' || progress.status === 'paused') {
+            // 直接使用保存的剩余时间，不进行调整
+            setTimeRemaining(progress.timeRemaining);
+            // 注意：不再在这里设置 userAnswers，而是在 loadExamDetail 中处理
+            setCurrentQuestionIndex(progress.currentQuestionIndex);
+            setExamStarted(true);
+            
+            // 检查URL中是否有continue=true参数，如果有则自动开始计时
+            const shouldContinue = router.query.continue === 'true';
+            if (shouldContinue && progress.status === 'paused') {
+              // 如果是从"继续考试"按钮进入的，自动开始计时
+              setIsPaused(false);
+              // 更新本地存储中的状态
+              const updatedProgress = {
+                ...progress,
+                status: 'in_progress',
+                savedAt: new Date().getTime() // 更新保存时间戳
+              };
+              localStorage.setItem(storageKey, JSON.stringify(updatedProgress));
+              toast.success("考试已自动恢复", { description: "计时已开始" });
+            } else {
+              setIsPaused(progress.status === 'paused');
+            }
+          }
+        } catch (error) {
+          console.error('恢复考试进度失败:', error);
+        }
+      }
     }
-  }, [id]);
+  }, [id, router.query.continue]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
     
-    if (examStarted && timeRemaining > 0) {
+    if (examStarted && timeRemaining > 0 && !isPaused) {
       timer = setInterval(() => {
         setTimeRemaining(prev => {
           if (prev <= 1) {
@@ -51,6 +107,7 @@ export default function ExamDetail() {
             handleSubmitExam();
             return 0;
           }
+          
           return prev - 1;
         });
       }, 1000);
@@ -59,19 +116,153 @@ export default function ExamDetail() {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [examStarted, timeRemaining]);
+  }, [examStarted, timeRemaining, isPaused]);
+  
+  // 添加页面刷新/离开事件监听
+  useEffect(() => {
+    // 只有在考试进行中且未暂停时才添加事件监听
+    if (examStarted && !isPaused && timeRemaining > 0) {
+      // 页面刷新或关闭前的处理函数
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        // 立即保存当前进度，并将状态设置为暂停
+        if (id) {
+          // 记录保存时间戳
+          const savedAt = new Date().getTime();
+          
+          const progress = {
+            status: 'paused', // 离开页面时始终设置为暂停状态
+            timeRemaining,
+            answers: userAnswers,
+            currentQuestionIndex,
+            savedAt
+          };
+          
+          const storageKey = `exam_progress_${id}`;
+          localStorage.setItem(storageKey, JSON.stringify(progress));
+        }
+        
+        // 显示确认对话框
+        const message = "离开页面将暂停考试，您的答案已保存。";
+        e.returnValue = message; // 标准
+        return message; // 兼容旧版本浏览器
+      };
+      
+      // 添加事件监听
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      
+      // 清理函数
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+    }
+  }, [examStarted, isPaused, timeRemaining, id, userAnswers, currentQuestionIndex]);
+  
+  // 保存考试进度到本地存储
+  const saveExamProgress = () => {
+    if (!id) return;
+    
+    // 记录保存时间戳
+    const savedAt = new Date().getTime();
+    
+    const progress = {
+      status: isPaused ? 'paused' : 'in_progress',
+      timeRemaining,
+      answers: userAnswers,
+      currentQuestionIndex,
+      savedAt // 添加保存时间戳
+    };
+    
+    const storageKey = `exam_progress_${id}`;
+    localStorage.setItem(storageKey, JSON.stringify(progress));
+  };
+
+  // 保存用户答案到本地存储
+  const saveAnswers = (newAnswers: UserAnswer[]) => {
+    if (!id) return;
+    
+    const storageKey = `exam_progress_${id}`;
+    const savedProgress = localStorage.getItem(storageKey);
+    
+    if (savedProgress) {
+      try {
+        const progress = JSON.parse(savedProgress);
+        progress.answers = newAnswers;
+        localStorage.setItem(storageKey, JSON.stringify(progress));
+      } catch (error) {
+        console.error('保存答案失败:', error);
+      }
+    } else {
+      // 如果没有保存的进度，创建一个新的
+      const savedAt = new Date().getTime();
+      
+      const progress = {
+        status: isPaused ? 'paused' : 'in_progress',
+        timeRemaining,
+        answers: newAnswers,
+        currentQuestionIndex,
+        savedAt
+      };
+      
+      localStorage.setItem(storageKey, JSON.stringify(progress));
+    }
+  };
 
   const loadExamDetail = async () => {
     try {
       setLoading(true);
       const response = await apiService.getExamDetail(Number(id));
-      if (response.data) {
+      
+      if (isApiSuccess(response)) {
         setExam(response.data);
+        
+        // 检查本地存储中是否有保存的答案
+        let savedAnswers: UserAnswer[] | null = null;
+        if (id) {
+          const storageKey = `exam_progress_${id}`;
+          const savedProgress = localStorage.getItem(storageKey);
+          
+          if (savedProgress) {
+            try {
+              const progress = JSON.parse(savedProgress);
+              if (progress.answers && progress.answers.length > 0) {
+                savedAnswers = progress.answers;
+              }
+            } catch (error) {
+              console.error('解析保存的答案失败:', error);
+            }
+          }
+        }
         
         // 初始化用户答案数组
         if (response.data.questions) {
-          setUserAnswers(response.data.questions.map(q => ({ questionId: q.question.question_id, answer: '' })));
+          if (savedAnswers) {
+            // 使用保存的答案，但确保所有题目都有对应的答案对象
+            const questionIds = response.data.questions.map(q => q.question.question_id);
+            const answersMap = new Map(savedAnswers.map(a => [a.questionId, a]));
+            
+            const mergedAnswers = questionIds.map(qId => {
+              return answersMap.has(qId) 
+                ? answersMap.get(qId)! 
+                : { questionId: qId, answer: '' };
+            });
+            
+            setUserAnswers(mergedAnswers);
+          } else {
+            // 没有保存的答案，使用空答案初始化
+            setUserAnswers(response.data.questions.map(q => ({ questionId: q.question.question_id, answer: '' })));
+          }
         }
+        
+        // 检查是否已参加过该考试
+        if (response.data.is_participated) {
+          // 获取考试记录
+          await loadExamAttempts();
+        } else {
+          // 直接开始考试
+          setExamStarted(true);
+        }
+      } else {
+        setError(response.message || '加载考试详情失败');
       }
     } catch (err) {
       setError('加载考试详情失败');
@@ -80,25 +271,121 @@ export default function ExamDetail() {
       setLoading(false);
     }
   };
+  
+  // 获取考试记录
+  const loadExamAttempts = async () => {
+    try {
+      if (!id) return;
+      
+      const response = await apiService.getMyExamAttempts({ 
+        exam_type: 'final',
+        per_page: 50
+      });
+      
+      if (isApiSuccess(response)) {
+        // 查找当前考试的记录
+        const attempt = response.data.attempts.find(a => a.exam.exam_id === Number(id));
+        
+        if (attempt) {
+          setExamAttempt(attempt);
+          
+          // 如果考试已提交或已评分，获取详情
+          if (attempt.status === 'submitted' || attempt.status === 'graded') {
+            setHasSubmittedAttempt(true);
+            await loadExamAttemptDetail(attempt.attempt_id);
+          } else if (attempt.status === 'in_progress') {
+            // 如果考试正在进行中，直接进入考试模式
+            setExamStarted(true);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('获取考试记录失败:', error);
+    }
+  };
+  
+  // 获取考试记录详情
+  const loadExamAttemptDetail = async (attemptId: number) => {
+    try {
+      const response = await apiService.getExamAttemptDetail(attemptId);
+      
+      if (isApiSuccess(response)) {
+        setAttemptDetail(response.data);
+      }
+    } catch (error) {
+      console.error('获取考试记录详情失败:', error);
+    }
+  };
 
   const startExam = () => {
-    if (exam?.duration_minutes) {
-      setTimeRemaining(exam.duration_minutes * 60); // 转换为秒
+    if (examProgress && (examProgress.status === 'in_progress' || examProgress.status === 'paused')) {
+      // 恢复已有的考试
+      setExamStarted(true);
+      setIsPaused(false);
+      toast.success("考试已恢复", { description: "您可以继续答题" });
+    } else {
+      // 开始新考试
+      if (exam?.duration_minutes) {
+        setTimeRemaining(exam.duration_minutes * 60); // 转换为秒
+      }
+      setExamStarted(true);
+      setIsPaused(false);
+      
+      // 保存初始状态
+      if (id) {
+        const progress = {
+          status: 'in_progress',
+          timeRemaining: exam?.duration_minutes ? exam.duration_minutes * 60 : 0,
+          answers: userAnswers,
+          currentQuestionIndex: 0
+        };
+        
+        const storageKey = `exam_progress_${id}`;
+        localStorage.setItem(storageKey, JSON.stringify(progress));
+      }
     }
-    setExamStarted(true);
+  };
+  
+  // 暂停考试
+  const pauseExam = () => {
+    // 显示暂停对话框
+    setShowPauseDialog(true);
+    // 先暂停计时
+    setIsPaused(true);
+  };
+  
+  // 继续考试
+  const resumeExam = () => {
+    setIsPaused(false);
+    setShowPauseDialog(false);
+    toast.success("考试继续", { description: "计时已恢复" });
+  };
+  
+  // 退出考试
+  const exitExam = () => {
+    // 保存当前考试进度
+    saveExamProgress();
+    toast.info("考试已暂停", { description: "您的答案已保存，可以稍后继续" });
+    // 返回考试列表页面
+    router.push('/exams');
   };
 
   const handleAnswerChange = (questionId: number, answer: string) => {
-    setUserAnswers(prev =>
-      prev.map(ua =>
+    setUserAnswers(prev => {
+      const newAnswers = prev.map(ua =>
         ua.questionId === questionId ? { ...ua, answer } : ua
-      )
-    );
+      );
+      
+      // 保存答案到本地存储
+      setTimeout(() => saveAnswers(newAnswers), 0);
+      
+      return newAnswers;
+    });
   };
 
   const handleMultipleChoiceChange = (questionId: number, optionKey: string, checked: boolean) => {
-    setUserAnswers(prev =>
-      prev.map(ua => {
+    setUserAnswers(prev => {
+      const newAnswers = prev.map(ua => {
         if (ua.questionId === questionId) {
           const currentAnswers = ua.answer ? ua.answer.split(',') : [];
           let newAnswers;
@@ -114,8 +401,13 @@ export default function ExamDetail() {
           return { ...ua, answer: newAnswers.join(',') };
         }
         return ua;
-      })
-    );
+      });
+      
+      // 保存答案到本地存储
+      setTimeout(() => saveAnswers(newAnswers), 0);
+      
+      return newAnswers;
+    });
   };
 
   const isMultipleChoiceOptionSelected = (questionId: number, optionKey: string): boolean => {
@@ -163,13 +455,20 @@ export default function ExamDetail() {
       if (response.code === 200) {
         setIsSubmitted(true);
         setExamStarted(false);
-        // 提交成功，不需要alert，会显示成功页面
-              } else {
-          setError(response.message || '提交失败，请重试');
+        
+        // 清除本地存储的考试进度
+        if (id) {
+          const storageKey = `exam_progress_${id}`;
+          localStorage.removeItem(storageKey);
         }
-      } catch (err) {
-        console.error('Error submitting exam:', err);
-        setError('网络错误，请检查网络连接后重试');
+        
+        // 提交成功，不需要alert，会显示成功页面
+      } else {
+        setError(response.message || '提交失败，请重试');
+      }
+    } catch (err) {
+      console.error('Error submitting exam:', err);
+      setError('网络错误，请检查网络连接后重试');
     } finally {
       setIsSubmitting(false);
     }
@@ -184,6 +483,175 @@ export default function ExamDetail() {
       return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // 渲染考试结果和答案解析
+  const renderExamResult = () => {
+    if (!attemptDetail || !exam) return null;
+    
+    const correctCount = attemptDetail.answer_records.filter(record => record.is_correct).length;
+    const wrongCount = attemptDetail.answer_records.filter(record => record.is_correct === false).length;
+    const totalQuestions = attemptDetail.answer_records.length;
+    const accuracyRate = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+    const isPassed = attemptDetail.score !== undefined && exam.passing_score !== undefined && attemptDetail.score >= exam.passing_score;
+    
+    return (
+      <div className="space-y-6">
+        {/* 考试结果概览 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" />
+              考试结果
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-3xl font-bold mb-1">
+                    {attemptDetail.score} / {exam.total_score}
+                  </div>
+                  <div className="text-sm text-gray-600">总分</div>
+                </div>
+                
+                <div className="flex justify-between">
+                  <div className="text-center">
+                    <div className="text-xl font-semibold text-green-600">{correctCount}</div>
+                    <div className="text-xs text-gray-600">正确</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-semibold text-red-600">{wrongCount}</div>
+                    <div className="text-xs text-gray-600">错误</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-semibold">{accuracyRate}%</div>
+                    <div className="text-xs text-gray-600">正确率</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">考试状态</span>
+                  <Badge variant={isPassed ? "default" : "destructive"} className={isPassed ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                    {isPassed ? (
+                      <><CheckCircle className="h-3 w-3 mr-1" /> 通过</>
+                    ) : (
+                      <><XCircle className="h-3 w-3 mr-1" /> 未通过</>
+                    )}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">及格分数</span>
+                  <span className="font-medium">{exam.passing_score}</span>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">开始时间</span>
+                  <span className="text-sm">{new Date(attemptDetail.start_time).toLocaleString('zh-CN')}</span>
+                </div>
+                
+                {attemptDetail.submit_time && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">提交时间</span>
+                    <span className="text-sm">{new Date(attemptDetail.submit_time).toLocaleString('zh-CN')}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* 题目详情和解析 */}
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold">题目解析</h2>
+          
+          {attemptDetail.answer_records.map((record, index) => (
+            <Card key={record.answer_id} className={`border-l-4 ${record.is_correct ? 'border-l-green-500' : 'border-l-red-500'}`}>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between text-base">
+                  <span>第 {index + 1} 题</span>
+                  <Badge variant={record.is_correct ? "outline" : "outline"} className={record.is_correct ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}>
+                    {record.is_correct ? '正确' : '错误'}
+                  </Badge>
+                </CardTitle>
+                <CardDescription className="text-base font-normal text-black">{record.question.content}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* 选项 */}
+                {record.question.options && Object.entries(record.question.options).map(([key, value]) => {
+                  const isCorrectOption = record.question.correct_answer === key;
+                  const isSelectedOption = record.student_answer === key;
+                  
+                  return (
+                    <div 
+                      key={key} 
+                      className={`p-3 rounded-md ${
+                        isCorrectOption ? 'bg-green-50 border border-green-200' : 
+                        isSelectedOption && !isCorrectOption ? 'bg-red-50 border border-red-200' : 
+                        'bg-gray-50 border border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex-shrink-0 mt-0.5">
+                          {isCorrectOption && <CheckCircle className="h-4 w-4 text-green-600" />}
+                          {isSelectedOption && !isCorrectOption && <XCircle className="h-4 w-4 text-red-600" />}
+                        </div>
+                        <div>
+                          <span className="font-medium">{key}. </span>
+                          <span>{value}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* 用户答案（非选择题） */}
+                {!record.question.options && (
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-sm text-gray-600">您的答案：</span>
+                      <p className="p-3 bg-gray-50 rounded-md mt-1">{record.student_answer || '未作答'}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-600">正确答案：</span>
+                      <p className="p-3 bg-green-50 rounded-md mt-1">{record.question.correct_answer}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* 解析 */}
+                {(record.question.analysis || record.question.explanation) && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-md">
+                    <div className="text-sm font-medium text-blue-800 mb-1">解析：</div>
+                    <div className="text-sm text-blue-900">{record.question.analysis || record.question.explanation}</div>
+                  </div>
+                )}
+                
+                {/* 得分 */}
+                <div className="flex justify-end">
+                  <Badge variant="outline" className="bg-gray-50">
+                    得分: {record.score_awarded || 0} / {exam.questions.find(q => q.question.question_id === record.question.question_id)?.score || 0}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        
+        {/* 操作按钮 */}
+        <div className="flex justify-center gap-4">
+          <Button variant="outline" onClick={() => router.push('/exams')}>
+            返回考试列表
+          </Button>
+          <Button onClick={() => router.push('/dashboard')}>
+            返回首页
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -224,6 +692,36 @@ export default function ExamDetail() {
   const totalQuestions = exam.questions?.length || 0;
   const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
+  // 已提交考试显示结果
+  if (hasSubmittedAttempt && attemptDetail) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          {/* 头部导航 */}
+          <div className="flex items-center gap-4 mb-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              返回
+            </Button>
+            
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-gray-900">{exam?.title}</h1>
+              <p className="text-gray-600">{exam?.course.title}</p>
+            </div>
+          </div>
+          
+          {renderExamResult()}
+        </div>
+      </div>
+    );
+  }
+  
+  // 刚刚提交考试成功
   if (isSubmitted) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -239,12 +737,12 @@ export default function ExamDetail() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-600">考试名称：</span>
-                <span className="font-medium">{exam.title}</span>
+                <span className="font-medium">{exam?.title}</span>
               </div>
               <div>
                 <span className="text-gray-600">考试类型：</span>
                 <span className="font-medium">
-                                         {exam.exam_type === 'exercise' ? '练习' : '期末考试'}
+                  {exam?.exam_type === 'exercise' ? '练习' : '期末考试'}
                 </span>
               </div>
               <div>
@@ -276,130 +774,6 @@ export default function ExamDetail() {
     );
   }
 
-  // 考试开始前的介绍页面
-  if (!examStarted) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-3xl mx-auto">
-          {/* 头部导航 */}
-          <div className="flex items-center gap-4 mb-6">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.back()}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              返回
-            </Button>
-            
-            <div className="flex-1">
-                           <h1 className="text-2xl font-bold text-gray-900">{exam.title}</h1>
-             <p className="text-gray-600">{exam.course.title}</p>
-            </div>
-            
-            <Badge variant={exam.is_participated ? "default" : "secondary"}>
-              {exam.is_participated ? "已参与" : "未参与"}
-            </Badge>
-          </div>
-
-          {/* 考试信息卡片 */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
-                考试信息
-              </CardTitle>
-              <CardDescription>请仔细阅读以下考试信息，确认后开始考试</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-sm text-gray-600">考试类型</span>
-                    <p className="font-medium">
-                      {exam.exam_type === 'exercise' ? '练习' : '期末考试'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-600">题目数量</span>
-                    <p className="font-medium">{totalQuestions} 题</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-600">考试时长</span>
-                    <p className="font-medium">{exam.duration_minutes || 60} 分钟</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-sm text-gray-600">满分</span>
-                    <p className="font-medium">{exam.total_score || 100} 分</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-600">及格分数</span>
-                    <p className="font-medium">{exam.passing_score || 60} 分</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-600">考试状态</span>
-                    <Badge variant={exam.is_participated ? "default" : "secondary"}>
-                      {exam.is_participated ? "已参与" : "未参与"}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 考试说明 */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>考试说明</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 text-sm text-gray-700">
-                <div className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">1</span>
-                  <p>考试开始后计时开始，请合理安排答题时间</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">2</span>
-                  <p>考试过程中可以切换题目，建议先完成有把握的题目</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">3</span>
-                  <p>时间到达后系统将自动提交，请注意时间管理</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">4</span>
-                  <p>提交后无法修改答案，请仔细检查后再提交</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 开始考试按钮 */}
-          <div className="text-center">
-            <Button
-              onClick={startExam}
-              disabled={exam.is_participated}
-              size="lg"
-              className="px-8 py-3 text-lg"
-            >
-              {exam.is_participated ? '已参与过此考试' : '开始考试'}
-            </Button>
-            
-            {exam.is_participated && (
-              <p className="mt-3 text-sm text-gray-600">
-                您已经参与过此考试，如需查看结果请前往考试记录页面
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // 考试进行中页面
   return (
     <div className="container mx-auto px-4 py-8">
@@ -407,13 +781,13 @@ export default function ExamDetail() {
         {/* 考试头部信息 */}
         <div className="flex items-center justify-between mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
           <div>
-                         <h1 className="text-xl font-bold text-gray-900">{exam.title}</h1>
-             <p className="text-sm text-gray-600">{exam.course.title}</p>
+            <h1 className="text-xl font-bold text-gray-900">{exam.title}</h1>
+            <p className="text-sm text-gray-600">{exam.course.title}</p>
           </div>
           
           <div className="flex items-center gap-4">
             <div className="text-center">
-              <div className="flex items-center gap-1 text-lg font-bold text-red-600">
+              <div className={`flex items-center gap-1 text-lg font-bold ${isPaused ? 'text-gray-600' : 'text-red-600'}`}>
                 <Timer className="h-5 w-5" />
                 {formatTime(timeRemaining)}
               </div>
@@ -426,6 +800,25 @@ export default function ExamDetail() {
               </div>
               <p className="text-xs text-gray-600">已完成</p>
             </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={isPaused ? resumeExam : pauseExam}
+              className={isPaused ? "bg-green-50 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"}
+            >
+              {isPaused ? (
+                <>
+                  <Play className="h-4 w-4 mr-1" />
+                  继续
+                </>
+              ) : (
+                <>
+                  <Pause className="h-4 w-4 mr-1" />
+                  暂停
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
@@ -628,6 +1021,53 @@ export default function ExamDetail() {
                 className="bg-red-600 hover:bg-red-700"
               >
                 {isSubmitting ? '提交中...' : '确认提交'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* 暂停对话框 */}
+        <Dialog open={showPauseDialog} onOpenChange={(open) => {
+          if (!open) {
+            // 如果对话框关闭，恢复考试
+            resumeExam();
+          }
+          setShowPauseDialog(open);
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>考试已暂停</DialogTitle>
+              <DialogDescription>
+                您可以继续考试或退出。退出后您的答案将被保存，可以稍后继续。
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">已回答题目：</span>
+                  <span className="font-medium">{answeredCount}/{totalQuestions}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">剩余时间：</span>
+                  <span className="font-medium">{formatTime(timeRemaining)}</span>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={exitExam}
+                className="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+              >
+                退出考试
+              </Button>
+              <Button
+                onClick={resumeExam}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                继续考试
               </Button>
             </DialogFooter>
           </DialogContent>
