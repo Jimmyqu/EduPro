@@ -743,7 +743,32 @@ export const apiService = {
     });
   },
 
+  // ==================== 新增考试状态管理接口 ====================
 
+  // 开始考试
+  async startExam(examId: number): Promise<ApiResponse<ExamAttempt>> {
+    return apiRequest(`/exams/${examId}/start`, { method: 'POST' });
+  },
+
+  // 暂停考试
+  async pauseExam(examId: number): Promise<ApiResponse> {
+    return apiRequest(`/exams/${examId}/pause`, { method: 'POST' });
+  },
+
+  // 继续考试
+  async resumeExam(examId: number): Promise<ApiResponse> {
+    return apiRequest(`/exams/${examId}/resume`, { method: 'POST' });
+  },
+
+  // 超时交卷
+  async expireExam(examId: number): Promise<ApiResponse> {
+    return apiRequest(`/exams/${examId}/expire`, { method: 'POST' });
+  },
+
+  // 查询考试记录
+  async getExamAttempt(examId: number): Promise<ApiResponse<ExamAttempt>> {
+    return apiRequest(`/exams/${examId}/attempt`);
+  },
 
   // ==================== 测试相关 ====================
   

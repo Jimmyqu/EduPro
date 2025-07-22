@@ -44,6 +44,7 @@ export function MockExam({ onBack, courseId }: MockExamProps) {
   const [total, setTotal] = useState(0);
   const [currentTab, setCurrentTab] = useState("exams");
   const { user } = useAuth();
+  const [attemptMap, setAttemptMap] = useState<{ [examId: number]: ExamAttempt }>({});
 
   // 获取考试列表
   const fetchExams = async (page = 1, search = "", courseId?: number) => {
@@ -91,6 +92,12 @@ export function MockExam({ onBack, courseId }: MockExamProps) {
       
       if (isApiSuccess(response)) {
         setMyAttempts(response.data.attempts);
+        // 构建 examId -> attempt 的映射
+        const map: { [examId: number]: ExamAttempt } = {};
+        response.data.attempts.forEach(attempt => {
+          map[attempt.exam.exam_id] = attempt;
+        });
+        setAttemptMap(map);
       } else {
         toast.error("获取考试记录失败", { description: response.message });
       }
@@ -151,28 +158,30 @@ export function MockExam({ onBack, courseId }: MockExamProps) {
 
   // 判断考试状态
   const getExamStatus = (exam: Exam) => {
-    // 在本地存储中查找考试进度
+    const attempt = attemptMap[exam.exam_id];
+    if (attempt) {
+      if (["in_progress", "paused"].includes(attempt.status)) return "in_progress";
+      if (["submitted", "graded", "expired"].includes(attempt.status)) return "completed";
+    }
+    // fallback: 本地缓存
     const storageKey = `exam_progress_${exam.exam_id}`;
     const savedProgress = localStorage.getItem(storageKey);
-    
     if (savedProgress) {
       const progress = JSON.parse(savedProgress);
-      if (progress.status === 'in_progress') {
+      if (progress.status === 'in_progress' || progress.status === 'paused') {
         return 'in_progress';
       }
     }
-    
     if (exam.is_participated) {
       return 'completed';
     }
-    
     return 'not_started';
   };
 
   // 获取考试状态显示
   const getExamStatusBadge = (exam: Exam) => {
     const status = getExamStatus(exam);
-    
+    console.log(status);
     if (status === 'in_progress') {
       return (
         <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
@@ -184,7 +193,7 @@ export function MockExam({ onBack, courseId }: MockExamProps) {
       return (
         <Badge variant="secondary" className="bg-blue-100 text-blue-800">
           <CheckCircle className="h-3 w-3 mr-1" />
-          已参加
+          已提交
         </Badge>
       );
     }
@@ -206,7 +215,7 @@ export function MockExam({ onBack, courseId }: MockExamProps) {
         <Button
           variant="default"
           className="w-full"
-          onClick={() => handleStartExam(exam.exam_id)}
+          onClick={() => handleStartExamWithApi(exam.exam_id)}
         >
           <Play className="h-4 w-4 mr-2" />
           继续考试
@@ -229,7 +238,7 @@ export function MockExam({ onBack, courseId }: MockExamProps) {
       <Button
         variant="default"
         className="w-full"
-        onClick={() => handleStartExam(exam.exam_id)}
+        onClick={() => handleStartExamWithApi(exam.exam_id)}
       >
         <BookOpen className="h-4 w-4 mr-2" />
         开始考试
@@ -355,6 +364,16 @@ export function MockExam({ onBack, courseId }: MockExamProps) {
     );
   };
 
+  // 新增：后端联动的开始/继续考试方法
+  const handleStartExamWithApi = async (examId: number) => {
+    const res = await apiService.startExam(examId);
+    if (isApiSuccess(res)) {
+      router.push(`/exams/${examId}`);
+    } else {
+      toast.error(res.message || '考试启动失败');
+    }
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -374,11 +393,7 @@ export function MockExam({ onBack, courseId }: MockExamProps) {
           <h1 className="text-2xl font-bold">考试中心</h1>
           <p className="text-muted-foreground">参加考试，检验学习成果</p>
         </div>
-        
-        <Button variant="outline" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          返回
-        </Button>
+
       </div>
 
 
