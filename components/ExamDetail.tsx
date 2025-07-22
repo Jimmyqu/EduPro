@@ -285,6 +285,7 @@ export default function ExamDetail() {
         per_page: 50
       });
       
+      console.log(response.data);
       if (isApiSuccess(response)) {
         // 查找当前考试的记录
         const attempt = response.data.attempts.find(a => a.exam.exam_id === Number(id));
@@ -293,7 +294,7 @@ export default function ExamDetail() {
           setExamAttempt(attempt);
           
           // 如果考试已提交或已评分，获取详情
-          if (attempt.status === 'submitted' || attempt.status === 'graded') {
+          if (attempt.status === 'submitted' || attempt.status === 'expired') {
             setHasSubmittedAttempt(true);
             await loadExamAttemptDetail(attempt.attempt_id);
           } else if (attempt.status === 'in_progress') {
@@ -484,22 +485,22 @@ export default function ExamDetail() {
   };
 
   // 新增：倒计时归零时自动超时交卷
-  useEffect(() => {
-    console.log(examStarted, timeRemaining, isPaused);
-    if (examStarted && timeRemaining === 0 && !isPaused) {
-      handleExpireExam();
-    }
-    // eslint-disable-next-line
-  }, [examStarted, timeRemaining, isPaused]);
+  // useEffect(() => {
+  //   console.log(examStarted, timeRemaining, isPaused);
+  //   if (examStarted && timeRemaining === 0 && !isPaused) {
+  //     handleExpireExam();
+  //   }
+  //   // eslint-disable-next-line
+  // }, [examStarted, timeRemaining, isPaused]);
 
-  // 新增：超时交卷API
-  const handleExpireExam = async () => {
-    if (!id) return;
-    await apiService.expireExam(Number(id));
-    setIsSubmitted(true);
-    setExamStarted(false);
-    toast.info('考试已超时交卷');
-  };
+  // // 新增：超时交卷API
+  // const handleExpireExam = async () => {
+  //   if (!id) return;
+  //   await apiService.expireExam(Number(id));
+  //   setIsSubmitted(true);
+  //   setExamStarted(false);
+  //   toast.info('考试已超时交卷');
+  // };
 
   // 修改handleSubmitExam为后端联动
   const handleSubmitExam = async () => {
@@ -778,6 +779,17 @@ export default function ExamDetail() {
   
   // 刚刚提交考试成功
   if (isSubmitted && attemptDetail) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          {renderExamResult()}
+        </div>
+      </div>
+    );
+  }
+
+  // 查看考试时，若状态为submitted或expired，直接显示结果
+  if ((examAttempt && (examAttempt.status === 'submitted' || examAttempt.status === 'expired')) && attemptDetail) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">

@@ -321,7 +321,7 @@ export interface ExamAttempt {
   start_time: string;
   submit_time?: string;
   score?: number;
-  status: 'in_progress' | 'submitted' | 'graded';
+  status: 'in_progress' | 'paused' | 'submitted' | 'graded' | 'expired';
 }
 
 // 考试记录列表响应
