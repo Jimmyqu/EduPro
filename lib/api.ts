@@ -433,6 +433,32 @@ async function apiRequest<T = any>(
     const response = await fetch(url, config);
     
     if (!response.ok) {
+      // 处理 401 Unauthorized 错误
+      if (response.status === 401 && endpoint !== '/auth/logout') {
+        // 避免在logout接口调用时产生死循环
+        try {
+          // 先调用logout API
+          await apiService.logout();
+        } catch (logoutError) {
+          console.error('Logout API call failed:', logoutError);
+        }
+        
+        // 清除本地存储的所有认证相关信息
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('currentUser'); // 清除用户信息，防止无限循环
+        
+        // 跳转到首页
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        
+        return {
+          code: -1,
+          message: '登录已过期，请重新登录',
+        };
+      }
+      
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
