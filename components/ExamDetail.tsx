@@ -348,10 +348,24 @@ export default function ExamDetail() {
   // 继续考试
   const resumeExam = async () => {
     if (!id) return;
-    await apiService.resumeExam(Number(id));
-    setIsPaused(false);
-    setShowPauseDialog(false);
-    toast.success('考试已继续');
+    try {
+      const response = await apiService.resumeExam(Number(id));
+      if (isApiSuccess(response)) {
+        setIsPaused(false);
+        setShowPauseDialog(false);
+        toast.success('考试已继续');
+      } else {
+        // 如果恢复失败（比如已超时），重新加载考试状态
+        if (response.message?.includes('超时')) {
+          toast.error('考试已超时，无法继续');
+          await fetchExamAttempt(); // 重新获取状态，触发结果页面显示
+        } else {
+          toast.error(response.message || '恢复考试失败');
+        }
+      }
+    } catch (error) {
+      toast.error('网络错误，请重试');
+    }
   };
   
   // 退出考试
@@ -451,13 +465,15 @@ export default function ExamDetail() {
         // 统一用工具函数计算剩余时间
         setTimeRemaining(getRemainingTime(attempt, exam));
         setExamStarted(attempt.status === 'in_progress');
-        setIsPaused((attempt.status as any) === 'paused');
-        // 自动恢复
-        if ((attempt.status as any) === 'paused') {
-          await apiService.resumeExam(Number(id));
-          setIsPaused(false);
-          setExamStarted(true);
-          toast.success('考试已自动恢复');
+        setIsPaused(attempt.status === 'paused');
+        
+        // 移除自动恢复逻辑，让用户手动选择是否继续
+        if (attempt.status === 'paused') {
+          toast.info('考试已暂停', { description: '点击继续按钮恢复考试' });
+        } else if (attempt.status === 'expired') {
+          toast.warning('考试已超时', { description: '将显示考试结果' });
+          // 如果考试已超时，加载考试结果
+          await loadExamAttempts();
         }
       }
     } catch (e) {
