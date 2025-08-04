@@ -45,7 +45,7 @@ export function CoursesList() {
     try {
       const params: any = {
         page: currentPage,
-        per_page: 12
+        per_page: 999
       };
 
       if (searchTerm.trim()) {

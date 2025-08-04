@@ -109,6 +109,38 @@ export function convertApiCourseToLocal(apiCourse: ApiCourse) {
   };
 }
 
+// 获取内容类型的辅助函数
+function getContentType(url: string | null | undefined): string {
+  if (!url) return 'other';
+  
+  const fileName = url.toLowerCase();
+  
+  // 视频格式
+  const videoExtensions = ['.mp4', '.flv', '.avi', '.mov', '.wmv', '.webm', '.mkv', '.m4v', '.3gp', '.ogv'];
+  if (videoExtensions.some(ext => fileName.endsWith(ext))) {
+    return 'video';
+  }
+  
+  // PDF格式
+  if (fileName.endsWith('.pdf')) {
+    return 'pdf';
+  }
+  
+  // 音频格式
+  const audioExtensions = ['.mp3', '.wav', '.ogg', '.aac', '.wma', '.m4a'];
+  if (audioExtensions.some(ext => fileName.endsWith(ext))) {
+    return 'audio';
+  }
+  
+  // 文档格式
+  const docExtensions = ['.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt'];
+  if (docExtensions.some(ext => fileName.endsWith(ext))) {
+    return 'document';
+  }
+  
+  return 'other';
+}
+
 export function convertApiCoursewareToLocal(apiCourseware: ApiCourseware) {
   return {
     id: apiCourseware.courseware_id.toString(),
@@ -120,9 +152,8 @@ export function convertApiCoursewareToLocal(apiCourseware: ApiCourseware) {
     category: apiCourseware.category,
     course: apiCourseware.course ? convertApiCourseToLocal(apiCourseware.course) : undefined,
     is_enrolled: apiCourseware.is_enrolled || false,
-    // 判断课件类型
-    type: apiCourseware.content_url?.endsWith('.mp4') ? 'video' : 
-          apiCourseware.content_url?.endsWith('.pdf') ? 'pdf' : 'other'
+    // 使用改进的类型判断逻辑
+    type: getContentType(apiCourseware.content_url)
   };
 }
 

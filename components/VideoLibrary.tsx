@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
@@ -84,7 +84,7 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
       if (courseId) {
         const params = {
           page: 1,
-          per_page: 12,
+          per_page: 999,
           course_id: courseId
         };
         
@@ -94,7 +94,7 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
           // 只显示视频类型的课件
           const allCoursewares = response.data.coursewares.map(convertApiCoursewareToLocal);
           const videoCoursewares = allCoursewares.filter(courseware => 
-            courseware.content_url?.includes('.mp4')
+            courseware.type === 'video'
           );
           
           // 提取所有课件分类
@@ -125,7 +125,7 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
           // 只显示视频类型的课件
           const allCoursewares = coursewaresResponse.data.coursewares.map(convertApiCoursewareToLocal);
           const videoCoursewares = allCoursewares.filter(courseware => 
-            courseware.content_url?.includes('.mp4')
+            courseware.type === 'video'
           );
           
           // 提取所有课件分类
@@ -389,7 +389,7 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
 
                       <CardHeader className="pb-3">
                         <div className="space-y-2">
-                          <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">
+                          <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors h-14 flex items-start">
                             {video.title}
                           </CardTitle>
                           {video.category && (
@@ -422,7 +422,7 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
                         )}
                       </CardHeader>
 
-                      <CardContent>
+                      <CardFooter>
                         <Button
                           className="w-full"
                           disabled={!video.is_enrolled}
@@ -439,7 +439,7 @@ export function VideoLibrary({ onBack, courseId }: VideoLibraryProps) {
                             </>
                           )}
                         </Button>
-                      </CardContent>
+                      </CardFooter>
                     </Card>
                   ))}
                 </div>

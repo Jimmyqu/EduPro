@@ -14,7 +14,9 @@ import {
   Eye,
   Loader2,
   AlertCircle,
-  BookOpen
+  BookOpen,
+  Headphones,
+  File
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiService, isApiSuccess } from "../lib/api";
@@ -44,7 +46,7 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
       
       const params: any = {
         page,
-        per_page: 12,
+        per_page: 999,
       };
       
       if (search.trim()) {
@@ -118,6 +120,10 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
         return <Play className="h-4 w-4 text-blue-600" />;
       case 'pdf':
         return <FileText className="h-4 w-4 text-red-600" />;
+      case 'audio':
+        return <Headphones className="h-4 w-4 text-green-600" />;
+      case 'document':
+        return <File className="h-4 w-4 text-orange-600" />;
       default:
         return <BookOpen className="h-4 w-4 text-gray-600" />;
     }
@@ -130,6 +136,10 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800">视频</Badge>;
       case 'pdf':
         return <Badge variant="secondary" className="bg-red-100 text-red-800">PDF</Badge>;
+      case 'audio':
+        return <Badge variant="secondary" className="bg-green-100 text-green-800">音频</Badge>;
+      case 'document':
+        return <Badge variant="secondary" className="bg-orange-100 text-orange-800">文档</Badge>;
       default:
         return <Badge variant="secondary" className="bg-gray-100 text-gray-800">其他</Badge>;
     }
@@ -145,13 +155,22 @@ export function CoursewaresList({ courseId }: CoursewaresListProps) {
     }
 
     if (courseware.content_url) {
-      // 这里可以根据课件类型做不同的处理
+      // 根据课件类型做不同的处理
       if (courseware.type === 'video') {
         toast.info("正在打开视频课件...");
         // TODO: 打开视频播放器
       } else if (courseware.type === 'pdf') {
         toast.info("正在打开PDF文档...");
         // TODO: 打开PDF查看器
+      } else if (courseware.type === 'audio') {
+        toast.info("正在打开音频课件...");
+        // TODO: 打开音频播放器
+      } else if (courseware.type === 'document') {
+        toast.info("正在打开文档...");
+        // TODO: 打开文档查看器
+      } else {
+        toast.info("正在打开课件...");
+        // TODO: 通用文件处理
       }
       
       // 更新学习进度（如果可学习）
